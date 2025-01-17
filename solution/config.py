@@ -1,11 +1,10 @@
 from pydantic_settings import BaseSettings
-from pydantic import Field
 
 class Settings(BaseSettings):
     SERVER_ADDRESS: str = "0.0.0.0:8080"
     SERVER_PORT: int = 8080
-    POSTGRES_CONN: str
-    POSTGRES_JDBC_URL: str
+    #POSTGRES_CONN: str
+    #POSTGRES_JDBC_URL: str
     POSTGRES_USERNAME: str
     POSTGRES_PASSWORD: str
     POSTGRES_HOST: str
@@ -27,3 +26,4 @@ class Settings(BaseSettings):
         env_file = ".env"
 
 settings = Settings()
+print(settings.database_url)

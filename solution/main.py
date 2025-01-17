@@ -1,14 +1,12 @@
-from fastapi import FastAPI
-from solution.models import Base
-from solution.backend.db import engine
-from solution.routers import auth
-from solution.config import settings
+from models import Base
+from backend.db import engine
+from config import settings
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from solution.routers import auth
+from routers import auth
 
 app = FastAPI()
 
@@ -36,4 +34,5 @@ if __name__ == "__main__":
     import uvicorn
     server_host, server_port = settings.SERVER_ADDRESS.split(":") if settings.SERVER_ADDRESS else ("0.0.0.0", settings.SERVER_PORT)
     uvicorn.run(app, host=server_host, port=int(server_port))
+
 

@@ -1,4 +1,3 @@
-# auth.py
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
@@ -6,10 +5,10 @@ from jose import jwt
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
 
-from solution.backend.db import get_db
-from solution.models import Company
-from solution.schemas import CompanyCreate, CompanyResponse
-from solution.config import settings
+from backend.db import get_db
+from models import Company
+from schemas import CompanyCreate, CompanyResponse
+from config import settings
 
 router = APIRouter()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
