@@ -1,32 +1,39 @@
-import os
-import uvicorn
-from solution.backend.db_depends import get_db
-from fastapi import FastAPI, Depends, HTTPException
-from .schemas import CompanyNameCreate, Email, Password
-from solution.routers.auth import register_company
-from solution.backend.db import async_session_maker
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import FastAPI
+from solution.models import Base
+from solution.backend.db import engine
+from solution.routers import auth
+from solution.config import settings
+
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+
+from solution.routers import auth
+
 app = FastAPI()
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=400,
+        content={"detail": "Invalid request data"}
+    )
+
+app.include_router(auth.router)
 
 @app.get("/api/ping")
 def send():
     return {"status": "ok"}
 
 
+@app.on_event("startup")
+async def startup():
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
-@app.post("/business/auth/sign-up", response_model=dict)
-async def sign_up_company(
-    name: CompanyNameCreate,
-    email: Email,
-    password: Password,
-    db: AsyncSession = Depends(get_db)
-):
-    try:
-        return await register_company(db=db, name=name, email=email, password=password)
-    except HTTPException as e:
-        raise e
 
 if __name__ == "__main__":
-    server_address = os.getenv("SERVER_ADDRESS", "0.0.0.0:8080")
-    host, port = server_address.split(":")
-    uvicorn.run(app, host=host, port=int(port))
+    import uvicorn
+    server_host, server_port = settings.SERVER_ADDRESS.split(":") if settings.SERVER_ADDRESS else ("0.0.0.0", settings.SERVER_PORT)
+    uvicorn.run(app, host=server_host, port=int(server_port))
+

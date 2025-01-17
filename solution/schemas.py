@@ -1,14 +1,10 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, constr
 
-class CompanyNameCreate(BaseModel):
-    name: str
-
-    class Config:
-        min_length = 1
-        max_length = 100
-
-class Email(BaseModel):
+class CompanyCreate(BaseModel):
+    name: constr(min_length=1, max_length=100)
     email: EmailStr
+    password: constr(min_length=8, max_length=128)
 
-class Password(BaseModel):
-    password: str
+class CompanyResponse(BaseModel):
+    token: str
+    company_id: int

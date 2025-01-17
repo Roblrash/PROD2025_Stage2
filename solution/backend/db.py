@@ -1,14 +1,10 @@
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
-import os
-from sqlalchemy.ext.declarative import declarative_base
+from solution.config import settings
 
-DATABASE_URL = os.getenv("POSTGRES_CONN_ASYNC")
+engine = create_async_engine(settings.database_url, future=True, echo=True)
+async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
-# Асинхронное подключение к базе данных
-engine = create_async_engine(DATABASE_URL, echo=True)
-
-# Используем async_sessionmaker для создания сессий
-async_session_maker = sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
-
-Base = declarative_base()
+async def get_db():
+    async with async_session() as session:
+        yield session

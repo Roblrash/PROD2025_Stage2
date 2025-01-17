@@ -1,2 +1,7 @@
 fastapi
 uvicorn
+sqlalchemy
+asyncpg
+python-dotenv
+bcrypt
+pydantic
