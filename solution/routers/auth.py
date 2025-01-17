@@ -10,7 +10,7 @@ from models import Company
 from schemas import CompanyCreate, CompanyResponse
 from config import settings
 
-router = APIRouter()
+router = APIRouter(prefix="/api")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def hash_password(password: str) -> str:
@@ -44,7 +44,7 @@ async def sign_up(
 
     token = create_access_token(
         data={"sub": new_company.email, "company_id": new_company.id},
-        expires_delta=timedelta(hours=1),
+        expires_delta=timedelta(hours=2),
     )
 
     return CompanyResponse(token=token, company_id=new_company.id)
