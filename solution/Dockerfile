@@ -1,10 +1,17 @@
-FROM python:3.12-alpine3.21
+# Базовый образ
+FROM python:3.10-slim
 
-WORKDIR /usr/src/app
+# Создадим рабочую директорию внутри контейнера
+WORKDIR /app
 
+# Скопируем только requirements.txt, чтобы сначала установить зависимости
 COPY requirements.txt .
-RUN pip install -r requirements.txt
 
+# Установим зависимости
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Скопируем всё остальное в контейнер
 COPY . .
 
-CMD [ "python", "./main.py" ]
+# Запуск приложения
+CMD ["uvicorn", "solution.main:app", "--host", "0.0.0.0", "--port", "8000"]
