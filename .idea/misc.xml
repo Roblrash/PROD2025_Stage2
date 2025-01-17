@@ -3,5 +3,8 @@
   <component name="Black">
     <option name="sdkName" value="Python 3.11 (PROD2025)" />
   </component>
+  <component name="ExtraIDETweaksSettingsProject">
+    <option name="enableOpenEditorsShowRecentFiles" value="false" />
+  </component>
   <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.11 (Online_shop_fastapi)" project-jdk-type="Python SDK" />
 </project>
