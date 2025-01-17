@@ -16,9 +16,6 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def validate_password(password: str) -> bool:
-    if not re.match(r"^.{8,20}$", password):
-        raise HTTPException(status_code=400, detail="Пароль должен быть длиной от 8 до 20 символов")
-
     if not re.search(r'[A-Z]', password):
         raise HTTPException(status_code=400, detail="Пароль должен содержать хотя бы одну заглавную букву")
 
