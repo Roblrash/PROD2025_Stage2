@@ -5,6 +5,7 @@ from jose import jwt
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
 
+import re
 from backend.db import get_db
 from models import Company
 from schemas import CompanyCreate, CompanyResponse
@@ -13,7 +14,28 @@ from config import settings
 router = APIRouter(prefix="/api")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+
+def validate_password(password: str) -> bool:
+    if not re.match(r"^.{8,20}$", password):
+        raise HTTPException(status_code=400, detail="Пароль должен быть длиной от 8 до 20 символов")
+
+    if not re.search(r'[A-Z]', password):
+        raise HTTPException(status_code=400, detail="Пароль должен содержать хотя бы одну заглавную букву")
+
+    if not re.search(r'[a-z]', password):
+        raise HTTPException(status_code=400, detail="Пароль должен содержать хотя бы одну строчную букву")
+
+    if not re.search(r'[0-9]', password):
+        raise HTTPException(status_code=400, detail="Пароль должен содержать хотя бы одну цифру")
+
+    if not re.search(r'[@#$%^&+=!]', password):
+        raise HTTPException(status_code=400,
+                            detail="Пароль должен содержать хотя бы один специальный символ (@, #, $, %, ^, &, +, =, !)")
+
+    return True
+
 def hash_password(password: str) -> str:
+    validate_password(password)
     return pwd_context.hash(password)
 
 def create_access_token(data: dict, expires_delta: timedelta) -> str:
