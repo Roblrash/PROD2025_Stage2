@@ -58,7 +58,6 @@ def create_access_token(data: dict, expires_delta: timedelta) -> str:
 
 async def get_current_company(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)):
     try:
-        # Декодируем JWT
         payload = jwt.decode(token, settings.RANDOM_SECRET, algorithms=["HS256"])
         company_id: int = payload.get("company_id")
         if company_id is None:
@@ -66,12 +65,14 @@ async def get_current_company(token: str = Depends(oauth2_scheme), db: AsyncSess
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-    # Проверка токена в Redis
     key = f"company:{company_id}:token"
     stored_token = await redis.get(key)
 
-    if stored_token is None or stored_token.decode() != token:
+    if stored_token is None:
         raise HTTPException(status_code=401, detail="Token is no longer valid")
+
+    if stored_token.decode("utf-8") != token:
+        raise HTTPException(status_code=401, detail="Token mismatch")
 
     result = await db.execute(select(Company).where(Company.id == company_id))
     company = result.scalar()
@@ -80,6 +81,7 @@ async def get_current_company(token: str = Depends(oauth2_scheme), db: AsyncSess
         raise HTTPException(status_code=404, detail="Company not found")
 
     return company
+
 
 
 async def save_token_to_redis(company_id: int, token: str, ttl: int):
