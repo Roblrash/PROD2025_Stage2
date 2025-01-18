@@ -121,7 +121,7 @@ async def sign_up(
 
     return CompanyResponse(token=token, company_id=new_company.id)
 
-@router.post("/sign-in", response_model=SignInResponse)
+@router.post("/business/auth/sign-in", response_model=SignInResponse)
 async def sign_in(
     sign_in_data: SignInRequest,
     db: AsyncSession = Depends(get_db)
