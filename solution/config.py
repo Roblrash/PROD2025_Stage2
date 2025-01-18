@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     POSTGRES_PORT: int
     POSTGRES_DATABASE: str
     REDIS_HOST: str
-    REDIS_PORT: int = 6379
+    REDIS_PORT: int
     #ANTIFRAUD_ADDRESS: str
     RANDOM_SECRET: str
 

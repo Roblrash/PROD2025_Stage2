@@ -8,3 +8,5 @@ python-jose[cryptography]
 passlib[bcrypt]
 pydantic-settings
 pydantic[email]
+alembic
+gunicorn

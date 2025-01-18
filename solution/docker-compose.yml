@@ -10,7 +10,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DATABASE}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT}:${POSTGRES_PORT}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
@@ -19,16 +19,16 @@ services:
     container_name: fastapi_redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT}:${REDIS_PORT}"
     volumes:
       - redis_data:/data
 
   app:
     build: .
     container_name: fastapi_app
-    command: uvicorn main:app --host 0.0.0.0 --port 8080
+    command: uvicorn main:app --host ${SERVER_ADDRESS} --port ${SERVER_PORT}
     ports:
-      - "8080:8080"
+      - "${SERVER_PORT}:${SERVER_PORT}"
     env_file:
       - .env
     depends_on:
