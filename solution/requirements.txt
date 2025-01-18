@@ -10,3 +10,4 @@ pydantic-settings
 pydantic[email]
 alembic
 gunicorn
+aioredis>=2.0.0
