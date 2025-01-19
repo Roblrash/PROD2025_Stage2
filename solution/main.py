@@ -1,14 +1,14 @@
-from models import Base
-from backend.db import engine
-from config import settings
-
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+import uvicorn
 
-from routers import auth
+from config import settings
+from backend.redis import connect, close
+from routers import auth, promo
 
 app = FastAPI()
+
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
@@ -16,26 +16,25 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         status_code=400,
         content={"detail": "Invalid request data"}
     )
-
 app.include_router(auth.router)
+app.include_router(promo.router)
 
 @app.get("/api/ping")
 def send():
     return {"status": "ok"}
 
-
 @app.on_event("startup")
 async def startup():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    app.state.redis = await connect()
+
+@app.on_event("shutdown")
+async def shutdown():
+    await close(app.state.redis)
 
 
 if __name__ == "__main__":
-    import uvicorn
     server_host, server_port = settings.SERVER_ADDRESS.split(":")
     uvicorn.run(app, host=server_host, port=int(server_port))
-
-
 
 
 

@@ -4,5 +4,5 @@ from config import settings
 async def connect():
     return redis.from_url(f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}")
 
-async def close(redis_client):
+async def close(redis_client: redis.Redis):
     await redis_client.close()

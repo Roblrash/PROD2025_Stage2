@@ -1,53 +1,48 @@
-from fastapi import APIRouter, HTTPException, Depends
-from fastapi.security import OAuth2PasswordBearer
+from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 from jose import jwt, JWTError
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
-
 import re
+
+from sqlalchemy.future import select
+from redis.asyncio import Redis
+
 from backend.db import get_db
 from models import Company
-from schemas import CompanyCreate, CompanyResponse, SignInRequest, SignInResponse
+from schemas import CompanyCreate, CompanyResponse, SignInResponse
 from config import settings
-from sqlalchemy.future import select
-from backend.redis import connect, close
+
 
 router = APIRouter(prefix="/api")
-redis = None
+
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="sign-in")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/business/auth/sign-in")
 
 
-@router.on_event("startup")
-async def startup_event():
-    global redis
-    redis = await connect()
+def get_redis(request: Request) -> Redis:
+    return request.app.state.redis
 
-@router.on_event("shutdown")
-async def shutdown_event():
-    await close(redis)
 
 def validate_password(password: str) -> bool:
     if not re.search(r'[A-Z]', password):
         raise HTTPException(status_code=400, detail="Пароль должен содержать хотя бы одну заглавную букву")
-
     if not re.search(r'[a-z]', password):
         raise HTTPException(status_code=400, detail="Пароль должен содержать хотя бы одну строчную букву")
-
     if not re.search(r'[0-9]', password):
         raise HTTPException(status_code=400, detail="Пароль должен содержать хотя бы одну цифру")
-
     if not re.search(r'[@#$%^&+=!]', password):
-        raise HTTPException(status_code=400, \
-                            detail="Пароль должен содержать хотя бы один специальный символ (@, #, $, %, ^, &, +, =, !)")
+        raise HTTPException(status_code=400, detail="Пароль должен содержать хотя бы один специальный символ (@, #, $, %, ^, &, +, =, !)")
 
     return True
+
 
 def hash_password(password: str) -> str:
     validate_password(password)
     return pwd_context.hash(password)
+
 
 def create_access_token(data: dict, expires_delta: timedelta) -> str:
     to_encode = data.copy()
@@ -56,7 +51,21 @@ def create_access_token(data: dict, expires_delta: timedelta) -> str:
     return jwt.encode(to_encode, settings.RANDOM_SECRET, algorithm="HS256")
 
 
-async def get_current_company(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)):
+async def save_token_to_redis(redis: Redis, company_id: int, token: str, ttl: int):
+    key = f"company:{company_id}:token"
+    await redis.set(key, token, ex=ttl)
+
+
+async def invalidate_existing_token(redis: Redis, company_id: int):
+    key = f"company:{company_id}:token"
+    await redis.delete(key)
+
+
+async def get_current_company(
+    token: str = Depends(oauth2_scheme),
+    db: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis)
+):
     try:
         payload = jwt.decode(token, settings.RANDOM_SECRET, algorithms=["HS256"])
         company_id: int = payload.get("company_id")
@@ -67,7 +76,6 @@ async def get_current_company(token: str = Depends(oauth2_scheme), db: AsyncSess
 
     key = f"company:{company_id}:token"
     stored_token = await redis.get(key)
-
     if stored_token is None:
         raise HTTPException(status_code=401, detail="Token is no longer valid")
 
@@ -76,27 +84,17 @@ async def get_current_company(token: str = Depends(oauth2_scheme), db: AsyncSess
 
     result = await db.execute(select(Company).where(Company.id == company_id))
     company = result.scalar()
-
     if company is None:
         raise HTTPException(status_code=404, detail="Company not found")
 
     return company
 
 
-
-async def save_token_to_redis(company_id: int, token: str, ttl: int):
-    key = f"company:{company_id}:token"
-    await redis.set(key, token, ex=ttl)
-
-
-async def invalidate_existing_token(company_id: int):
-    key = f"company:{company_id}:token"
-    await redis.delete(key)
-
 @router.post("/business/auth/sign-up", response_model=CompanyResponse)
 async def sign_up(
     company_data: CompanyCreate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis)
 ):
     hashed_password = hash_password(company_data.password)
     new_company = Company(
@@ -117,29 +115,30 @@ async def sign_up(
         data={"sub": new_company.email, "company_id": new_company.id},
         expires_delta=timedelta(hours=2),
     )
-    await save_token_to_redis(new_company.id, token, ttl=7200)
+    await save_token_to_redis(redis, new_company.id, token, ttl=7200)
 
     return CompanyResponse(token=token, company_id=new_company.id)
 
+
 @router.post("/business/auth/sign-in", response_model=SignInResponse)
 async def sign_in(
-    sign_in_data: SignInRequest,
-    db: AsyncSession = Depends(get_db)
+    sign_in_data: OAuth2PasswordRequestForm = Depends(),
+    db: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis)
 ):
-    result = await db.execute(select(Company).where(Company.email == sign_in_data.email))
+    result = await db.execute(select(Company).where(Company.email == sign_in_data.username))
     company = result.scalar()
 
     if not company or not pwd_context.verify(sign_in_data.password, company.password):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
-    await invalidate_existing_token(company.id)
+    await invalidate_existing_token(redis, company.id)
 
     token = create_access_token(
         data={"sub": company.email, "company_id": company.id},
         expires_delta=timedelta(hours=2),
     )
 
-    await save_token_to_redis(company.id, token, ttl=7200)
+    await save_token_to_redis(redis, company.id, token, ttl=7200)
 
     return SignInResponse(token=token, company_id=company.id)
-

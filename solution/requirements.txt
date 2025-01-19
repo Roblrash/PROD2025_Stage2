@@ -11,3 +11,4 @@ pydantic[email]
 alembic
 gunicorn
 redis
+python-multipart
