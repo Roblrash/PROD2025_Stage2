@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field, model_validator, constr
+from pydantic import BaseModel, EmailStr, Field, model_validator, constr, HttpUrl
 from typing import Optional, List, Literal
 from datetime import date
 
@@ -42,6 +42,7 @@ class PromoCreate(BaseModel):
     active_from: Optional[date] = None
     active_until: Optional[date] = None
     description: Optional[str] = None
+    image_url: Optional[HttpUrl] = None
 
     @model_validator(mode="after")
     def check_logic(self) -> "PromoCreate":
