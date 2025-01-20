@@ -34,7 +34,7 @@ class PromoCreate(BaseModel):
     target: Target
     max_count: conint(ge=1)
     active_from: str
-    active_until: Optional[str]
+    active_until: Optional[str] = None
     mode: constr(pattern=r'^(COMMON|UNIQUE)$')
     promo_common: Optional[str] = None
     promo_unique: Optional[List[str]] = None
