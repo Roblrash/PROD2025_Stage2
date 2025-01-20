@@ -21,12 +21,12 @@ app = FastAPI()
 #
 # app.openapi_schema = load_openapi_schema()
 
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    return JSONResponse(
-        status_code=400,
-        content={"detail": "Invalid request data"}
-    )
+# @app.exception_handler(RequestValidationError)
+# async def validation_exception_handler(request: Request, exc: RequestValidationError):
+#     return JSONResponse(
+#         status_code=400,
+#         content={"detail": "Invalid request data"}
+#     )
 
 app.include_router(auth.router)
 app.include_router(promo.router)
