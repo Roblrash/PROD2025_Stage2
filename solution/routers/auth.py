@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends, Request, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
-from jose import jwt, JWTError
+from jose import jwt, JWTError, ExpiredSignatureError
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
 import re
@@ -60,10 +60,13 @@ async def invalidate_existing_token(redis: Redis, company_id: int):
     await redis.delete(key)
 
 
-async def get_current_company(authorization: str = Header(None), db: AsyncSession = Depends(get_db),
-                              redis: Redis = Depends(get_redis)):
+async def get_current_company(
+    authorization: str = Header(...),
+    db: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis)
+):
     if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Authorization header missing or invalid")
+        raise HTTPException(status_code=401, detail="Authorization header missing or invalid format")
 
     token = authorization.split(" ")[1]
 
@@ -71,18 +74,17 @@ async def get_current_company(authorization: str = Header(None), db: AsyncSessio
         payload = jwt.decode(token, settings.RANDOM_SECRET, algorithms=["HS256"])
         company_id: int = payload.get("company_id")
         if company_id is None:
-            raise HTTPException(status_code=401, detail="Invalid token")
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid token")
+            raise HTTPException(status_code=401, detail="Invalid token: 'company_id' not found")
+    except ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token has expired")
+    except JWTError as e:
+        raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
 
     key = f"company:{company_id}:token"
     stored_token = await redis.get(key)
 
-    if stored_token is None:
-        raise HTTPException(status_code=401, detail="Token is no longer valid")
-
-    if stored_token.decode("utf-8") != token:
-        raise HTTPException(status_code=401, detail="Token mismatch")
+    if not stored_token or stored_token.decode("utf-8") != token:
+        raise HTTPException(status_code=401, detail="Token mismatch or not valid")
 
     result = await db.execute(select(Company).where(Company.id == company_id))
     company = result.scalar()
@@ -91,6 +93,7 @@ async def get_current_company(authorization: str = Header(None), db: AsyncSessio
         raise HTTPException(status_code=401, detail="Company not found")
 
     return company
+
 
 
 @router.post("/business/auth/sign-up", response_model=CompanyResponse)
