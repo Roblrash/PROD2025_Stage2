@@ -18,6 +18,10 @@ class SignInResponse(BaseModel):
     token: str
     company_id: int
 
+class SignInRequest(BaseModel):
+    username: str
+    password: str
+
 
 # ---- Promo Schemas ----
 

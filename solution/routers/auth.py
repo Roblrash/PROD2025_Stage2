@@ -12,7 +12,7 @@ from redis.asyncio import Redis
 
 from backend.db import get_db
 from models.company import Company
-from schemas import CompanyCreate, CompanyResponse, SignInResponse
+from schemas import CompanyCreate, CompanyResponse, SignInResponse, SignInRequest
 from config import settings
 
 
@@ -122,7 +122,7 @@ async def sign_up(
 
 @router.post("/business/auth/sign-in", response_model=SignInResponse)
 async def sign_in(
-    sign_in_data: OAuth2PasswordRequestForm = Depends(),
+    sign_in_data: SignInRequest,
     db: AsyncSession = Depends(get_db),
     redis: Redis = Depends(get_redis)
 ):
