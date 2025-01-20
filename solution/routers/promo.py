@@ -18,10 +18,10 @@ async def create_promo(
 ) -> Dict[str, Any]:
     new_promo = PromoCode(
         company_id=company.id,
-        type=promo_data.type,
-        code=promo_data.code,
-        codes=promo_data.codes,
-        limit=promo_data.limit,
+        type=promo_data.mode,
+        code=promo_data.promo_common,
+        codes=promo_data.promo_unique,
+        limit=promo_data.max_count,
         target=promo_data.target.dict(),
         description=promo_data.description,
         active_from=promo_data.active_from,
