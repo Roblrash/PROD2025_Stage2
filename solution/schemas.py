@@ -42,7 +42,7 @@ class PromoCreate(BaseModel):
     target: Optional[PromoTarget] = None
     active_from: Optional[date] = None
     active_until: Optional[date] = None
-    description: Optional[str] = None
+    description: str
     image_url: Optional[HttpUrl] = None
 
     @root_validator(pre=True)
