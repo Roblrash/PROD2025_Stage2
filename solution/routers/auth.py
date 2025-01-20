@@ -11,6 +11,7 @@ from config import settings
 from sqlalchemy.future import select
 from redis.asyncio import Redis
 import uuid
+from typing import Optional
 
 
 def get_redis(request: Request) -> Redis:
@@ -43,10 +44,10 @@ async def invalidate_existing_token(redis: Redis, company_id: int):
 
 
 async def get_current_company(
-    authorization: str = Header(...),
-    db: AsyncSession = Depends(get_db),
-    redis: Redis = Depends(get_redis)
-):
+        authorization: str = Header(...),
+        db: AsyncSession = Depends(get_db),
+        redis: Redis = Depends(get_redis)
+) -> Company:
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Authorization header missing or invalid format")
 
@@ -54,7 +55,7 @@ async def get_current_company(
 
     try:
         payload = jwt.decode(token, settings.RANDOM_SECRET, algorithms=["HS256"])
-        company_id: int = payload.get("company_id")
+        company_id: Optional[int] = payload.get("company_id")
         if company_id is None:
             raise HTTPException(status_code=401, detail="Invalid token: 'company_id' not found")
     except ExpiredSignatureError:
@@ -65,7 +66,10 @@ async def get_current_company(
     key = f"company:{company_id}:token"
     stored_token = await redis.get(key)
 
-    if not stored_token or stored_token.decode("utf-8") != token:
+    if not stored_token:
+        raise HTTPException(status_code=401, detail="Token not found in Redis")
+
+    if stored_token.decode("utf-8") != token:
         raise HTTPException(status_code=401, detail="Token mismatch or not valid")
 
     result = await db.execute(select(Company).where(Company.id == company_id))
