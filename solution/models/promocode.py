@@ -5,8 +5,6 @@ import uuid
 from sqlalchemy.dialects.postgresql import UUID
 from models import *
 
-
-
 class PromoCode(Base):
     __tablename__ = "promo_codes"
 
@@ -17,7 +15,7 @@ class PromoCode(Base):
     codes = Column(JSON, nullable=True)
     limit = Column(Integer, default=0)
     active = Column(Boolean, default=True)
-    description = Column(String(255), nullable=True)
+    description = Column(String(300), nullable=True)
     active_from = Column(Date, nullable=True)
     active_until = Column(Date, nullable=True)
     target = Column(JSON, nullable=True)

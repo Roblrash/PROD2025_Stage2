@@ -12,3 +12,4 @@ alembic
 gunicorn
 redis
 python-multipart
+pycountry

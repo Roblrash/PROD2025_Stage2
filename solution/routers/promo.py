@@ -16,19 +16,23 @@ async def create_promo(
         db: AsyncSession = Depends(get_db),
         company=Depends(get_current_company),
 ) -> Dict[str, Any]:
-    promo_common = promo_data.promo_common if promo_data.promo_common is not None else None
-    promo_unique = promo_data.promo_unique if promo_data.promo_unique is not None else None
+    promo_code = promo_data.promo_common if promo_data.mode == 'COMMON' else None
+    promo_codes = promo_data.promo_unique if promo_data.mode == 'UNIQUE' else None
+
+    description = promo_data.description if promo_data.description else None
+    active_from = promo_data.active_from if promo_data.active_from else None
+    active_until = promo_data.active_until if promo_data.active_until else None
 
     new_promo = PromoCode(
         company_id=company.id,
         type=promo_data.mode,
-        code=promo_common,
-        codes=promo_unique,
+        code=promo_code,
+        codes=promo_codes,
         limit=promo_data.max_count,
-        target=promo_data.target.dict() if promo_data.target else {},  # Если target не указан, пустой словарь
-        description=promo_data.description,
-        active_from=promo_data.active_from,
-        active_until=promo_data.active_until,
+        target=promo_data.target.dict() if promo_data.target else {},
+        description=description,
+        active_from=active_from,
+        active_until=active_until,
         active=True,
         activations_count=0,
     )

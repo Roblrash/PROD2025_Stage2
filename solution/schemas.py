@@ -1,76 +1,172 @@
-from pydantic import BaseModel, EmailStr, Field, model_validator, constr, HttpUrl, root_validator, validator
-from typing import Optional, List, Literal
-from datetime import date
-
-class CompanyCreate(BaseModel):
-    name: constr(min_length=1, max_length=100)
-    email: EmailStr
-    password: constr(min_length=8, max_length=128)
-
-class CompanyResponse(BaseModel):
-    token: str
-    company_id: int
+from pydantic import BaseModel, EmailStr, HttpUrl, conint, constr, validator, Field
+from typing import List, Optional
+from uuid import UUID
+import pycountry
+import re
 
 
-class SignInRequest(BaseModel):
-    email: EmailStr
-    password: constr(min_length=8, max_length=128)
+class PromoDescription(BaseModel):
+    description: constr(min_length=10, max_length=300)
+
+class PromoImageURL(BaseModel):
+    image_url: HttpUrl
+
+    @validator('image_url')
+    def validate_image_url_length(cls, value):
+        if len(value) > 350:
+            raise ValueError("Длина URL не может превышать 350 символов.")
+        return value
 
 
-class SignInResponse(BaseModel):
-    token: str
-    company_id: int
+class Target(BaseModel):
+    age_from: conint(ge=0)
+    age_until: conint(ge=0)
+    country: constr(pattern=r'^[A-Za-z]{2}$')
+    categories: List[str]
 
-class PromoTarget(BaseModel):
-    age_from: Optional[int] = None
-    age_until: Optional[int] = None
-    country: Optional[str] = None
+    @validator('country')
+    def validate_country(cls, value):
+        value = value.upper()
+        if not pycountry.countries.get(alpha_2=value):
+            raise ValueError("Страна не существует в ISO 3166-1 alpha-2.")
 
-    @model_validator(mode="after")
-    def check_ages(self) -> "PromoTarget":
-        if self.age_from is not None and self.age_until is not None:
-            if self.age_from > self.age_until:
-                raise ValueError("age_from must be <= age_until")
-        return self
+        return value
 
-    @validator("country")
-    def normalize_country(cls, v):
-        if v is not None:
-            return v.strip().lower()
-        return v
+class PromoPatch(BaseModel):
+    description: PromoDescription
+    image_url: PromoImageURL
+    target: Target
+    max_count: Optional[conint(ge=0)] = None
+    active_from: Optional[str]
+    active_until: Optional[str]
 
 class PromoCreate(BaseModel):
-    mode: Literal["COMMON", "UNIQUE"]
+    description: PromoDescription
+    image_url: PromoImageURL
+    target: Target
+    max_count: conint(ge=1)
+    active_from: str
+    active_until: str
+    mode: constr(pattern=r'^(COMMON|UNIQUE)$')
     promo_common: Optional[str] = None
     promo_unique: Optional[List[str]] = None
-    max_count: int = Field(..., ge=0)
-    target: PromoTarget = None
-    active_from: Optional[date] = None
-    active_until: Optional[date] = None
-    description: str
-    image_url: Optional[HttpUrl] = None
 
-    @root_validator(pre=True)
-    def check_logic(cls, values):
-        mode = values.get("mode")
-        promo_common = values.get("promo_common")
-        promo_unique = values.get("promo_unique")
+class PromoForUser(BaseModel):
+    promo_id: UUID
+    company_id: UUID
+    company_name: str
+    description: PromoDescription
+    image_url: PromoImageURL
+    active: bool
+    is_activated_by_user: bool
+    like_count: conint(ge=0)
+    is_liked_by_user: bool
+    comment_count: conint(ge=0)
 
-        if mode == "COMMON":
-            if not promo_common:
-                raise ValueError("For type=COMMON, 'promo_common' is required.")
-            if promo_unique:
-                raise ValueError("For type=COMMON, 'promo_unique' must be empty or omitted.")
-        elif mode == "UNIQUE":
-            if not promo_unique or len(promo_unique) == 0:
-                raise ValueError("For type=UNIQUE, 'promo_unique' is required and cannot be empty.")
-            if promo_common:
-                raise ValueError("For type=UNIQUE, 'promo_common' must be empty or omitted.")
+class PromoReadOnly(BaseModel):
+    description: PromoDescription
+    image_url: PromoImageURL
+    target: Target
+    max_count: conint(ge=1)
+    active_from: str
+    active_until: str
+    mode: constr(pattern=r'^(COMMON|UNIQUE)$')
+    promo_common: Optional[str] = None
+    promo_unique: Optional[List[str]] = None
+    promo_id: UUID
+    company_id: UUID
+    company_name: str
+    like_count: conint(ge=0)
+    used_count: conint(ge=0)
+    active: bool
 
-        return values
+class PromoStat(BaseModel):
+    activations_count: conint(ge=0)
+    countries: List[dict]
 
-    @validator("description")
-    def check_description_length(cls, v):
-        if len(v) < 5:
-            raise ValueError("Description must be at least 5 characters long.")
+
+class UserTargetSettings(BaseModel):
+    age: conint(ge=0)
+    country: constr(pattern=r'^[A-Za-z]{2}$')
+
+    @validator('country')
+    def validate_country(cls, value):
+        value = value.upper()
+        if not pycountry.countries.get(alpha_2=value):
+            raise ValueError("Страна не существует в ISO 3166-1 alpha-2.")
+        return value
+
+class UserFirstName(BaseModel):
+    first_name: constr(min_length=1, max_length=100)
+
+class UserSurname(BaseModel):
+    surname: constr(min_length=1, max_length=120)
+
+class UserAvatarURL(BaseModel):
+    avatar_url: HttpUrl
+
+    @validator('avatar_url')
+    def validate_avatar_url_length(cls, value):
+        if len(value) > 350:
+            raise ValueError("Длина URL не может превышать 350 символов.")
+        return value
+
+class User(BaseModel):
+    name: UserFirstName
+    surname: UserSurname
+    email: EmailStr
+    avatar_url: Optional[UserAvatarURL]
+    other: UserTargetSettings
+
+class UserRegister(BaseModel):
+    email: str
+    password: str
+
+    @validator("password")
+    def validate_password(cls, v):
+        password_pattern = r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$"
+        if not re.match(password_pattern, v):
+            raise ValueError("Неправильный формат пароля")
+        return v
+
+class SignIn(BaseModel):
+    email: EmailStr
+    password: str
+
+    @validator("password")
+    def validate_password(cls, v):
+        password_pattern = r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$"
+        if not re.match(password_pattern, v):
+            raise ValueError("Неправильный формат пароля")
+        return v
+
+class PromoId(BaseModel):
+    promo_id: UUID
+
+class CommentId(BaseModel):
+    comment_id: UUID
+
+class CompanyId(BaseModel):
+    company_id: UUID
+
+class CompanyResponse(BaseModel):
+    token: str = Field(..., max_length=300)
+    company_id: CompanyId
+
+class SignInResponse(BaseModel):
+    token: str = Field(..., max_length=300)
+
+class CompanyName(BaseModel):
+    company_name: str = Field(..., min_length=5, max_length=50)
+
+class CompanyCreate(BaseModel):
+    name: str = Field(..., min_length=5, max_length=50)
+    email: EmailStr = Field(..., min_length=8, max_length=120)
+    password: str = Field(..., min_length=8, max_length=60)
+
+    @validator("password")
+    def validate_password(cls, v):
+        password_pattern = r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$"
+        if not re.match(password_pattern, v):
+            raise ValueError("Неправильный формат пароля")
         return v

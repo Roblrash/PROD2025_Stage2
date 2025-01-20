@@ -4,13 +4,13 @@ from sqlalchemy.exc import IntegrityError
 from jose import jwt, JWTError, ExpiredSignatureError
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
-import re
 from backend.db import get_db
-from models import Company
-from schemas import CompanyCreate, CompanyResponse, SignInRequest, SignInResponse
+from models.company import Company
+from schemas import CompanyResponse, CompanyCreate, SignIn, SignInResponse, CompanyId
 from config import settings
 from sqlalchemy.future import select
 from redis.asyncio import Redis
+import uuid
 
 
 def get_redis(request: Request) -> Redis:
@@ -21,25 +21,7 @@ router = APIRouter(prefix="/api")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
-def validate_password(password: str) -> bool:
-    if not re.search(r'[A-Z]', password):
-        raise HTTPException(status_code=400, detail="Пароль должен содержать хотя бы одну заглавную букву")
-
-    if not re.search(r'[a-z]', password):
-        raise HTTPException(status_code=400, detail="Пароль должен содержать хотя бы одну строчную букву")
-
-    if not re.search(r'[0-9]', password):
-        raise HTTPException(status_code=400, detail="Пароль должен содержать хотя бы одну цифру")
-
-    if not re.search(r'[@#$%^&+=!]', password):
-        raise HTTPException(status_code=400,
-                            detail="Пароль должен содержать хотя бы один специальный символ (@, #, $, %, ^, &, +, =, !)")
-
-    return True
-
-
 def hash_password(password: str) -> str:
-    validate_password(password)
     return pwd_context.hash(password)
 
 
@@ -95,7 +77,6 @@ async def get_current_company(
     return company
 
 
-
 @router.post("/business/auth/sign-up", response_model=CompanyResponse)
 async def sign_up(
         company_data: CompanyCreate,
@@ -120,17 +101,22 @@ async def sign_up(
         raise HTTPException(status_code=409, detail="Email is already registered")
 
     token = create_access_token(
-        data={"sub": new_company.email, "company_id": new_company.id},
+        data={"sub": new_company.email, "company_id": str(uuid.uuid4())},  # Используйте UUID для токена
         expires_delta=timedelta(hours=2),
     )
 
     await save_token_to_redis(redis, new_company.id, token, ttl=7200)
-    return CompanyResponse(token=token, company_id=new_company.id)
+
+    # Создаем объект CompanyId
+    company_id_obj = CompanyId(company_id=uuid.uuid4())  # Генерация UUID
+
+    # Возвращаем объект CompanyResponse
+    return CompanyResponse(token=token, company_id=company_id_obj)
 
 
 @router.post("/business/auth/sign-in", response_model=SignInResponse)
 async def sign_in(
-        sign_in_data: SignInRequest,
+        sign_in_data: SignIn,
         db: AsyncSession = Depends(get_db),
         redis: Redis = Depends(get_redis)
 ):
@@ -139,7 +125,6 @@ async def sign_in(
 
     if not company or not pwd_context.verify(sign_in_data.password, company.password):
         raise HTTPException(status_code=401, detail="Invalid email or password")
-
     await invalidate_existing_token(redis, company.id)
 
     token = create_access_token(
@@ -149,4 +134,4 @@ async def sign_in(
 
     await save_token_to_redis(redis, company.id, token, ttl=7200)
 
-    return SignInResponse(token=token, company_id=company.id)
+    return SignInResponse(token=token)
