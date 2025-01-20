@@ -16,8 +16,8 @@ class PromoCode(Base):
     limit = Column(Integer, default=0)
     active = Column(Boolean, default=True)
     description = Column(String(300), nullable=True)
-    active_from = Column(Date, nullable=True)
-    active_until = Column(Date, nullable=True)
+    active_from = Column(String, nullable=True)
+    active_until = Column(String, nullable=True)
     target = Column(JSON, nullable=True)
     activations_count = Column(Integer, default=0)
 
