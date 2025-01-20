@@ -12,17 +12,20 @@ router = APIRouter(prefix="/api/business/promo")
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_promo(
-    promo_data: PromoCreate,
-    db: AsyncSession = Depends(get_db),
-    company=Depends(get_current_company),
+        promo_data: PromoCreate,
+        db: AsyncSession = Depends(get_db),
+        company=Depends(get_current_company),
 ) -> Dict[str, Any]:
+    promo_common = promo_data.promo_common if promo_data.promo_common is not None else None
+    promo_unique = promo_data.promo_unique if promo_data.promo_unique is not None else None
+
     new_promo = PromoCode(
         company_id=company.id,
         type=promo_data.mode,
-        code=promo_data.promo_common,
-        codes=promo_data.promo_unique,
+        code=promo_common,
+        codes=promo_unique,
         limit=promo_data.max_count,
-        target=promo_data.target.dict(),
+        target=promo_data.target.dict() if promo_data.target else {},  # Если target не указан, пустой словарь
         description=promo_data.description,
         active_from=promo_data.active_from,
         active_until=promo_data.active_until,

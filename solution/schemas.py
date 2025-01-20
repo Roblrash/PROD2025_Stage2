@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field, model_validator, constr, HttpUrl, root_validator
+from pydantic import BaseModel, EmailStr, Field, model_validator, constr, HttpUrl, root_validator, validator
 from typing import Optional, List, Literal
 from datetime import date
 
@@ -33,6 +33,11 @@ class PromoTarget(BaseModel):
                 raise ValueError("age_from must be <= age_until")
         return self
 
+    @validator("country")
+    def normalize_country(cls, v):
+        if v is not None:
+            return v.strip().lower()
+        return v
 
 class PromoCreate(BaseModel):
     mode: Literal["COMMON", "UNIQUE"]
@@ -63,3 +68,9 @@ class PromoCreate(BaseModel):
                 raise ValueError("For type=UNIQUE, 'promo_common' must be empty or omitted.")
 
         return values
+
+    @validator("description")
+    def check_description_length(cls, v):
+        if len(v) < 5:
+            raise ValueError("Description must be at least 5 characters long.")
+        return v
