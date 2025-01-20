@@ -20,6 +20,6 @@ class Settings(BaseSettings):
         return f"postgresql+asyncpg://{self.POSTGRES_USERNAME}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DATABASE}"
 
     class Config:
-        env_file = "solution/.env"
+        env_file = ".env"
 #менять на solution/.env для alembic
 settings = Settings()
