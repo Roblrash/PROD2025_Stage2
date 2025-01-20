@@ -37,8 +37,8 @@ class PromoCreate(BaseModel):
     type: Literal["COMMON", "UNIQUE"]
     code: Optional[str] = None
     codes: Optional[List[str]] = None
-    limit: int = Field(0, ge=0)
-    target: PromoTarget = Field(default_factory=PromoTarget)
+    limit: int = Field(..., ge=0)
+    target: Optional[PromoTarget] = None
     active_from: Optional[date] = None
     active_until: Optional[date] = None
     description: Optional[str] = None
