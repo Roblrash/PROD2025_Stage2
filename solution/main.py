@@ -3,6 +3,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 import uvicorn
 
+from backend.db import engine
+from models import Base
 from config import settings
 from backend.redis import connect, close
 from routers import auth, promo
@@ -23,13 +25,17 @@ app.include_router(promo.router)
 def send():
     return {"status": "ok"}
 
+
 @app.on_event("startup")
 async def startup():
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
     app.state.redis = await connect()
 
 @app.on_event("shutdown")
 async def shutdown():
     await close(app.state.redis)
+
 
 
 if __name__ == "__main__":
