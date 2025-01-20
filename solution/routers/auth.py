@@ -34,7 +34,8 @@ def validate_password(password: str) -> bool:
         raise HTTPException(status_code=400, detail="Пароль должен содержать хотя бы одну цифру")
 
     if not re.search(r'[@#$%^&+=!]', password):
-        raise HTTPException(status_code=400, detail="Пароль должен содержать хотя бы один специальный символ (@, #, $, %, ^, &, +, =, !)")
+        raise HTTPException(status_code=400,
+                            detail="Пароль должен содержать хотя бы один специальный символ (@, #, $, %, ^, &, +, =, !)")
 
     return True
 
@@ -61,7 +62,8 @@ async def invalidate_existing_token(redis: Redis, company_id: int):
     await redis.delete(key)
 
 
-async def get_current_company(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db), redis: Redis = Depends(get_redis)):
+async def get_current_company(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db),
+                              redis: Redis = Depends(get_redis)):
     try:
         payload = jwt.decode(token, settings.RANDOM_SECRET, algorithms=["HS256"])
         company_id: int = payload.get("company_id")
@@ -90,16 +92,18 @@ async def get_current_company(token: str = Depends(oauth2_scheme), db: AsyncSess
 
 @router.post("/business/auth/sign-up", response_model=CompanyResponse)
 async def sign_up(
-    company_data: CompanyCreate,
-    db: AsyncSession = Depends(get_db),
-    redis: Redis = Depends(get_redis)
+        company_data: CompanyCreate,
+        db: AsyncSession = Depends(get_db),
+        redis: Redis = Depends(get_redis)
 ):
     hashed_password = hash_password(company_data.password)
+
     new_company = Company(
         name=company_data.name,
         email=company_data.email,
         password=hashed_password,
     )
+
     db.add(new_company)
 
     try:
@@ -115,15 +119,14 @@ async def sign_up(
     )
 
     await save_token_to_redis(redis, new_company.id, token, ttl=7200)
-
     return CompanyResponse(token=token, company_id=new_company.id)
 
 
 @router.post("/business/auth/sign-in", response_model=SignInResponse)
 async def sign_in(
-    sign_in_data: SignInRequest,
-    db: AsyncSession = Depends(get_db),
-    redis: Redis = Depends(get_redis)
+        sign_in_data: SignInRequest,
+        db: AsyncSession = Depends(get_db),
+        redis: Redis = Depends(get_redis)
 ):
     result = await db.execute(select(Company).where(Company.email == sign_in_data.email))
     company = result.scalar()
