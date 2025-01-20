@@ -7,7 +7,7 @@ from routers.auth import get_current_company
 from models.promocode import PromoCode
 from schemas import PromoCreate
 
-router = APIRouter(prefix="/business/promo")
+router = APIRouter(prefix="/api/business/promo")
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
