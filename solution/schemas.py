@@ -1,18 +1,8 @@
-from pydantic import BaseModel, EmailStr, HttpUrl, conint, constr, validator, Field
+from pydantic import BaseModel, EmailStr, conint, constr, validator, Field
 from typing import List, Optional
 from uuid import UUID
 import pycountry
 import re
-
-
-class PromoImageURL(BaseModel):
-    image_url: HttpUrl
-
-    @validator('image_url')
-    def validate_image_url_length(cls, value):
-        if len(value) > 350:
-            raise ValueError("Длина URL не может превышать 350 символов.")
-        return value
 
 
 class Target(BaseModel):
@@ -44,7 +34,7 @@ class PromoCreate(BaseModel):
     target: Target
     max_count: conint(ge=1)
     active_from: str
-    active_until: str
+    active_until: Optional[str]
     mode: constr(pattern=r'^(COMMON|UNIQUE)$')
     promo_common: Optional[str] = None
     promo_unique: Optional[List[str]] = None
@@ -54,7 +44,7 @@ class PromoForUser(BaseModel):
     company_id: UUID
     company_name: str
     description: constr(min_length=10, max_length=300)
-    image_url: PromoImageURL
+    image_url: str
     active: bool
     is_activated_by_user: bool
     like_count: conint(ge=0)
@@ -63,7 +53,7 @@ class PromoForUser(BaseModel):
 
 class PromoReadOnly(BaseModel):
     description: constr(min_length=10, max_length=300)
-    image_url: PromoImageURL
+    image_url: str
     target: Target
     max_count: conint(ge=1)
     active_from: str
@@ -100,20 +90,11 @@ class UserFirstName(BaseModel):
 class UserSurname(BaseModel):
     surname: constr(min_length=1, max_length=120)
 
-class UserAvatarURL(BaseModel):
-    avatar_url: HttpUrl
-
-    @validator('avatar_url')
-    def validate_avatar_url_length(cls, value):
-        if len(value) > 350:
-            raise ValueError("Длина URL не может превышать 350 символов.")
-        return value
-
 class User(BaseModel):
     name: UserFirstName
     surname: UserSurname
     email: EmailStr
-    avatar_url: Optional[UserAvatarURL]
+    avatar_url: Optional[str]
     other: UserTargetSettings
 
 class UserRegister(BaseModel):
