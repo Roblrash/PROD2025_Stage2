@@ -34,10 +34,10 @@ class PromoTarget(BaseModel):
         return self
 
 class PromoCreate(BaseModel):
-    type: Literal["COMMON", "UNIQUE"]
-    code: Optional[str] = None
-    codes: Optional[List[str]] = None
-    limit: int = Field(..., ge=0)
+    mode: Literal["COMMON", "UNIQUE"]
+    promo_common: Optional[str] = None
+    promo_unique: Optional[List[str]] = None
+    max_count: int = Field(..., ge=0)
     target: Optional[PromoTarget] = None
     active_from: Optional[date] = None
     active_until: Optional[date] = None
