@@ -62,7 +62,7 @@ async def invalidate_existing_token(redis: Redis, company_id: int):
 
 async def get_current_company(authorization: str = Header(None), db: AsyncSession = Depends(get_db),
                               redis: Redis = Depends(get_redis)):
-    if not authorization or not authorization.startswith("Bearer "):
+    if not authorization:
         raise HTTPException(status_code=401, detail="Authorization header missing or invalid")
 
     token = authorization.split(" ")[1]
