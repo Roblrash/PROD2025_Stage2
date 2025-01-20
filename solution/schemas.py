@@ -5,9 +5,6 @@ import pycountry
 import re
 
 
-class PromoDescription(BaseModel):
-    description: constr(min_length=10, max_length=300)
-
 class PromoImageURL(BaseModel):
     image_url: HttpUrl
 
@@ -19,10 +16,11 @@ class PromoImageURL(BaseModel):
 
 
 class Target(BaseModel):
-    age_from: conint(ge=0)
-    age_until: conint(ge=0)
-    country: constr(pattern=r'^[A-Za-z]{2}$')
-    categories: List[str]
+    age_from: Optional[conint(ge=0)] = None
+    age_until: Optional[conint(ge=0)] = None
+    country: Optional[constr(pattern=r'^[A-Za-z]{2}$')] = None
+    categories: Optional[List[str]] = None
+
 
     @validator('country')
     def validate_country(cls, value):
@@ -33,16 +31,16 @@ class Target(BaseModel):
         return value
 
 class PromoPatch(BaseModel):
-    description: PromoDescription
-    image_url: PromoImageURL
+    description: constr(min_length=10, max_length=300)
+    image_url: str
     target: Target
     max_count: Optional[conint(ge=0)] = None
     active_from: Optional[str]
     active_until: Optional[str]
 
 class PromoCreate(BaseModel):
-    description: PromoDescription
-    image_url: PromoImageURL
+    description: constr(min_length=10, max_length=300)
+    image_url: str
     target: Target
     max_count: conint(ge=1)
     active_from: str
@@ -55,7 +53,7 @@ class PromoForUser(BaseModel):
     promo_id: UUID
     company_id: UUID
     company_name: str
-    description: PromoDescription
+    description: constr(min_length=10, max_length=300)
     image_url: PromoImageURL
     active: bool
     is_activated_by_user: bool
@@ -64,7 +62,7 @@ class PromoForUser(BaseModel):
     comment_count: conint(ge=0)
 
 class PromoReadOnly(BaseModel):
-    description: PromoDescription
+    description: constr(min_length=10, max_length=300)
     image_url: PromoImageURL
     target: Target
     max_count: conint(ge=1)
