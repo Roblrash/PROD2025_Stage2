@@ -30,7 +30,7 @@ class PromoPatch(BaseModel):
 
 class PromoCreate(BaseModel):
     description: constr(min_length=10, max_length=300)
-    image_url: str
+    image_url: Optional[str] = None
     target: Target
     max_count: conint(ge=1)
     active_from: str
