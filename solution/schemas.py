@@ -44,7 +44,7 @@ class PromoCreate(BaseModel):
     promo_common: Optional[str] = None
     promo_unique: Optional[List[str]] = None
     max_count: int = Field(..., ge=0)
-    target: Optional[PromoTarget] = None
+    target: PromoTarget = None
     active_from: Optional[date] = None
     active_until: Optional[date] = None
     description: str
