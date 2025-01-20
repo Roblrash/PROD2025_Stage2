@@ -10,7 +10,7 @@ from schemas import PromoCreate
 router = APIRouter(prefix="/api/business/promo")
 
 
-@router.post("/", status_code=status.HTTP_201_CREATED)
+@router.post("", status_code=status.HTTP_201_CREATED)
 async def create_promo(
     promo_data: PromoCreate,
     db: AsyncSession = Depends(get_db),
