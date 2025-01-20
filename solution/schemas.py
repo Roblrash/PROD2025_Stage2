@@ -33,7 +33,7 @@ class PromoCreate(BaseModel):
     image_url: Optional[str] = None
     target: Target
     max_count: conint(ge=1)
-    active_from: str
+    active_from: Optional[str] = None
     active_until: Optional[str] = None
     mode: constr(pattern=r'^(COMMON|UNIQUE)$')
     promo_common: Optional[str] = None
