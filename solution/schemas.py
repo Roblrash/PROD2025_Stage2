@@ -46,14 +46,14 @@ class PromoCreate(BaseModel):
 
     @model_validator(mode="after")
     def check_logic(self) -> "PromoCreate":
-        if self.type == "COMMON":
+        if self.mode == "COMMON":
             if not self.code:
                 raise ValueError("For type=COMMON, 'code' is required.")
             if self.codes:
                 raise ValueError("For type=COMMON, 'codes' must be empty or omitted.")
-        elif self.type == "UNIQUE":
+        elif self.mode == "UNIQUE":
             if not self.codes or len(self.codes) == 0:
                 raise ValueError("For type=UNIQUE, 'codes' is required and cannot be empty.")
-            if self.code:
+            if self.mode:
                 raise ValueError("For type=UNIQUE, 'code' must be empty or omitted.")
         return self
