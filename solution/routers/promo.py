@@ -4,7 +4,7 @@ from typing import Dict, Any
 
 from backend.db import get_db
 from routers.auth import get_current_company
-from models import PromoCode
+from models.promocode import PromoCode
 from schemas import PromoCreate
 
 router = APIRouter(prefix="/business/promo")

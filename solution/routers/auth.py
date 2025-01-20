@@ -11,7 +11,7 @@ from sqlalchemy.future import select
 from redis.asyncio import Redis
 
 from backend.db import get_db
-from models import Company
+from models.company import Company
 from schemas import CompanyCreate, CompanyResponse, SignInResponse
 from config import settings
 
