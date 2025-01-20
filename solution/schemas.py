@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field, model_validator, constr, HttpUrl
+from pydantic import BaseModel, EmailStr, Field, model_validator, constr, HttpUrl, root_validator
 from typing import Optional, List, Literal
 from datetime import date
 
@@ -33,6 +33,7 @@ class PromoTarget(BaseModel):
                 raise ValueError("age_from must be <= age_until")
         return self
 
+
 class PromoCreate(BaseModel):
     mode: Literal["COMMON", "UNIQUE"]
     promo_common: Optional[str] = None
@@ -44,16 +45,21 @@ class PromoCreate(BaseModel):
     description: Optional[str] = None
     image_url: Optional[HttpUrl] = None
 
-    @model_validator(mode="after")
-    def check_logic(self) -> "PromoCreate":
-        if self.mode == "COMMON":
-            if not self.promo_common:
-                raise ValueError("For type=COMMON, 'code' is required.")
-            if self.promo_unique:
-                raise ValueError("For type=COMMON, 'codes' must be empty or omitted.")
-        elif self.mode == "UNIQUE":
-            if not self.promo_unique or len(self.promo_unique) == 0:
-                raise ValueError("For type=UNIQUE, 'codes' is required and cannot be empty.")
-            if self.mode:
-                raise ValueError("For type=UNIQUE, 'code' must be empty or omitted.")
-        return self
+    @root_validator(pre=True)
+    def check_logic(cls, values):
+        mode = values.get("mode")
+        promo_common = values.get("promo_common")
+        promo_unique = values.get("promo_unique")
+
+        if mode == "COMMON":
+            if not promo_common:
+                raise ValueError("For type=COMMON, 'promo_common' is required.")
+            if promo_unique:
+                raise ValueError("For type=COMMON, 'promo_unique' must be empty or omitted.")
+        elif mode == "UNIQUE":
+            if not promo_unique or len(promo_unique) == 0:
+                raise ValueError("For type=UNIQUE, 'promo_unique' is required and cannot be empty.")
+            if promo_common:
+                raise ValueError("For type=UNIQUE, 'promo_common' must be empty or omitted.")
+
+        return values
