@@ -1,38 +1,38 @@
 from fastapi import APIRouter, HTTPException, Depends, Request
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 from jose import jwt, JWTError
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
 import re
-
+from backend.db import get_db
+from models import Company
+from schemas import CompanyCreate, CompanyResponse, SignInRequest, SignInResponse
+from config import settings
 from sqlalchemy.future import select
 from redis.asyncio import Redis
-
-from backend.db import get_db
-from models.company import Company
-from schemas import CompanyCreate, CompanyResponse, SignInResponse, SignInRequest
-from config import settings
-
-
-router = APIRouter(prefix="/api")
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/business/auth/sign-in")
 
 
 def get_redis(request: Request) -> Redis:
     return request.app.state.redis
 
 
+router = APIRouter(prefix="/api")
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/business/auth/sign-in")
+
+
 def validate_password(password: str) -> bool:
     if not re.search(r'[A-Z]', password):
         raise HTTPException(status_code=400, detail="Пароль должен содержать хотя бы одну заглавную букву")
+
     if not re.search(r'[a-z]', password):
         raise HTTPException(status_code=400, detail="Пароль должен содержать хотя бы одну строчную букву")
+
     if not re.search(r'[0-9]', password):
         raise HTTPException(status_code=400, detail="Пароль должен содержать хотя бы одну цифру")
+
     if not re.search(r'[@#$%^&+=!]', password):
         raise HTTPException(status_code=400, detail="Пароль должен содержать хотя бы один специальный символ (@, #, $, %, ^, &, +, =, !)")
 
@@ -61,11 +61,7 @@ async def invalidate_existing_token(redis: Redis, company_id: int):
     await redis.delete(key)
 
 
-async def get_current_company(
-    token: str = Depends(oauth2_scheme),
-    db: AsyncSession = Depends(get_db),
-    redis: Redis = Depends(get_redis)
-):
+async def get_current_company(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db), redis: Redis = Depends(get_redis)):
     try:
         payload = jwt.decode(token, settings.RANDOM_SECRET, algorithms=["HS256"])
         company_id: int = payload.get("company_id")
@@ -76,6 +72,7 @@ async def get_current_company(
 
     key = f"company:{company_id}:token"
     stored_token = await redis.get(key)
+
     if stored_token is None:
         raise HTTPException(status_code=401, detail="Token is no longer valid")
 
@@ -84,6 +81,7 @@ async def get_current_company(
 
     result = await db.execute(select(Company).where(Company.id == company_id))
     company = result.scalar()
+
     if company is None:
         raise HTTPException(status_code=404, detail="Company not found")
 
@@ -115,6 +113,7 @@ async def sign_up(
         data={"sub": new_company.email, "company_id": new_company.id},
         expires_delta=timedelta(hours=2),
     )
+
     await save_token_to_redis(redis, new_company.id, token, ttl=7200)
 
     return CompanyResponse(token=token, company_id=new_company.id)
@@ -126,7 +125,7 @@ async def sign_in(
     db: AsyncSession = Depends(get_db),
     redis: Redis = Depends(get_redis)
 ):
-    result = await db.execute(select(Company).where(Company.email == sign_in_data.username))
+    result = await db.execute(select(Company).where(Company.email == sign_in_data.email))
     company = result.scalar()
 
     if not company or not pwd_context.verify(sign_in_data.password, company.password):

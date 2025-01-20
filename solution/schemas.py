@@ -1,23 +1,25 @@
-from pydantic import BaseModel, EmailStr, Field, model_validator
+from pydantic import BaseModel, EmailStr, Field, model_validator, constr
 from typing import Optional, List, Literal
 from datetime import date
 
 class CompanyCreate(BaseModel):
-    name: str = Field(..., min_length=1, max_length=100)
+    name: constr(min_length=1, max_length=100)
     email: EmailStr
-    password: str = Field(..., min_length=8, max_length=128)
+    password: constr(min_length=8, max_length=128)
 
 class CompanyResponse(BaseModel):
     token: str
     company_id: int
 
+
+class SignInRequest(BaseModel):
+    email: EmailStr
+    password: constr(min_length=8, max_length=128)
+
+
 class SignInResponse(BaseModel):
     token: str
     company_id: int
-
-class SignInRequest(BaseModel):
-    username: str
-    password: str
 
 class PromoTarget(BaseModel):
     age_from: Optional[int] = None
