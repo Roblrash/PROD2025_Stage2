@@ -10,6 +10,9 @@ from schemas import PromoCreate
 router = APIRouter(prefix="/api/business/promo")
 
 
+from datetime import datetime
+
+
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_promo(
         promo_data: PromoCreate,
@@ -20,8 +23,9 @@ async def create_promo(
     promo_codes = promo_data.promo_unique if promo_data.mode == 'UNIQUE' else None
 
     description = promo_data.description if promo_data.description else None
-    active_from = promo_data.active_from if promo_data.active_from else None
-    active_until = promo_data.active_until if promo_data.active_until else None
+
+    active_from = datetime.strptime(promo_data.active_from, "%Y-%m-%d").date() if promo_data.active_from else None
+    active_until = datetime.strptime(promo_data.active_until, "%Y-%m-%d").date() if promo_data.active_until else None
 
     new_promo = PromoCode(
         company_id=company.id,
