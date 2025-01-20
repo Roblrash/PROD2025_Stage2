@@ -1,5 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, Request
-from fastapi.security import OAuth2PasswordBearer
+from fastapi import APIRouter, HTTPException, Depends, Request, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 from jose import jwt, JWTError
@@ -20,7 +19,6 @@ def get_redis(request: Request) -> Redis:
 
 router = APIRouter(prefix="/api")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/business/auth/sign-in")
 
 
 def validate_password(password: str) -> bool:
@@ -62,8 +60,13 @@ async def invalidate_existing_token(redis: Redis, company_id: int):
     await redis.delete(key)
 
 
-async def get_current_company(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db),
+async def get_current_company(authorization: str = Header(None), db: AsyncSession = Depends(get_db),
                               redis: Redis = Depends(get_redis)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Authorization header missing or invalid")
+
+    token = authorization.split(" ")[1]
+
     try:
         payload = jwt.decode(token, settings.RANDOM_SECRET, algorithms=["HS256"])
         company_id: int = payload.get("company_id")
@@ -85,7 +88,7 @@ async def get_current_company(token: str = Depends(oauth2_scheme), db: AsyncSess
     company = result.scalar()
 
     if company is None:
-        raise HTTPException(status_code=404, detail="Company not found")
+        raise HTTPException(status_code=401, detail="Company not found")
 
     return company
 
