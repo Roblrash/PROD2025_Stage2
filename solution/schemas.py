@@ -2,9 +2,6 @@ from pydantic import BaseModel, EmailStr, Field, model_validator
 from typing import Optional, List, Literal
 from datetime import date
 
-
-# ---- Company Schemas ----
-
 class CompanyCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     email: EmailStr
@@ -22,9 +19,6 @@ class SignInRequest(BaseModel):
     username: str
     password: str
 
-
-# ---- Promo Schemas ----
-
 class PromoTarget(BaseModel):
     age_from: Optional[int] = None
     age_until: Optional[int] = None
@@ -36,7 +30,6 @@ class PromoTarget(BaseModel):
             if self.age_from > self.age_until:
                 raise ValueError("age_from must be <= age_until")
         return self
-
 
 class PromoCreate(BaseModel):
     type: Literal["COMMON", "UNIQUE"]
