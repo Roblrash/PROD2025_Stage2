@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 from jose import jwt, JWTError, ExpiredSignatureError
 from passlib.context import CryptContext
+from typing import Dict
 from datetime import datetime, timedelta
 from backend.db import get_db
 from models.company import Company
@@ -26,10 +27,16 @@ def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
 
-def create_access_token(data: dict, expires_delta: timedelta) -> str:
+def create_access_token(data: Dict, expires_delta: timedelta) -> str:
     to_encode = data.copy()
+
     expire = datetime.utcnow() + expires_delta
     to_encode.update({"exp": expire})
+
+    for key, value in to_encode.items():
+        if isinstance(value, uuid.UUID):
+            to_encode[key] = str(value)
+
     return jwt.encode(to_encode, settings.RANDOM_SECRET, algorithm="HS256")
 
 
