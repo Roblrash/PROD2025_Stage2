@@ -3,10 +3,6 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 import uvicorn
-from pathlib import Path
-
-from sqlalchemy.orm.sync import update
-
 from config import settings
 from backend.redis import connect, close
 from routers import auth, promo
