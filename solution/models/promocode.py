@@ -3,7 +3,6 @@ from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, JSON, Date
 from sqlalchemy.orm import relationship
 import uuid
 from sqlalchemy.dialects.postgresql import UUID
-from datetime import date
 
 
 class PromoCode(Base):
@@ -13,13 +12,13 @@ class PromoCode(Base):
     company_id = Column(UUID(as_uuid=True), ForeignKey("companies.id"), nullable=False)
     limit = Column(Integer, default=0)
     active = Column(Boolean, default=True)
-    description = Column(String(), nullable=True)
+    description = Column(String(300), nullable=True)
     active_from = Column(Date, nullable=True)
     active_until = Column(Date, nullable=True)
     target = Column(JSON, nullable=True)
     activations_count = Column(Integer, default=0)
-    mode = Column(String(), nullable=False)
-    promo_common = Column(String(), nullable=True)
+    mode = Column(String(15), nullable=False)
+    promo_common = Column(String(30), nullable=True)
     promo_unique = Column(JSON, nullable=True)
 
     company = relationship("Company", back_populates="promos")
