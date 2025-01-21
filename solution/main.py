@@ -5,13 +5,15 @@ from fastapi.responses import JSONResponse
 import uvicorn
 from pathlib import Path
 
+from sqlalchemy.orm.sync import update
+
 from config import settings
 from backend.redis import connect, close
 from routers import auth, promo
 
 app = FastAPI()
 
-# def load_openapi_schema():
+#def load_openapi_schema():
 #     openapi_path = Path("api.yml")
 #     if openapi_path.exists():
 #         with open(openapi_path, mode="r", encoding="utf8") as f:
@@ -19,14 +21,14 @@ app = FastAPI()
 #             return openapi_schema
 #     return None
 #
-# app.openapi_schema = load_openapi_schema()
+#app.openapi_schema = load_openapi_schema()
 
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    return JSONResponse(
-        status_code=400,
-        content={"detail": "Invalid request data"}
-    )
+# @app.exception_handler(RequestValidationError)
+# async def validation_exception_handler(request: Request, exc: RequestValidationError):
+#     return JSONResponse(
+#         status_code=400,
+#         content={"detail": "Invalid request data"}
+#     )
 
 app.include_router(auth.router)
 app.include_router(promo.router)

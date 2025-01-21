@@ -1,18 +1,19 @@
-from pydantic import BaseModel, EmailStr, conint, constr, validator, Field
+from pydantic import BaseModel, EmailStr, conint, constr, field_validator, Field, conlist, root_validator
 from typing import List, Optional
 from uuid import UUID
+from datetime import datetime
 import pycountry
 import re
 
 
 class Target(BaseModel):
-    age_from: Optional[conint(ge=0)] = None
-    age_until: Optional[conint(ge=0)] = None
+    age_from: Optional[conint(ge=0, le=100)] = None
+    age_until: Optional[conint(ge=0, le=100)] = None
     country: Optional[constr(pattern=r'^[A-Za-z]{2}$')] = None
-    categories: Optional[List[str]] = None
+    categories: Optional[conlist(constr(min_length=2, max_length=20), min_length=0, max_length=20)] = None
 
 
-    @validator('country')
+    @field_validator('country')
     def validate_country(cls, value):
         value = value.upper()
         if not pycountry.countries.get(alpha_2=value):
@@ -30,14 +31,14 @@ class PromoPatch(BaseModel):
 
 class PromoCreate(BaseModel):
     description: constr(min_length=10, max_length=300)
-    image_url: Optional[str] = None
+    image_url: Optional[constr(max_length=350)] = None
     target: Target
-    max_count: conint(ge=1)
+    max_count: conint(ge=0, le=100000000)
     active_from: Optional[str] = None
     active_until: Optional[str] = None
     mode: constr(pattern=r'^(COMMON|UNIQUE)$')
-    promo_common: Optional[str] = None
-    promo_unique: Optional[List[str]] = None
+    promo_common: Optional[constr(min_length=5, max_length=30)] = None
+    promo_unique: Optional[conlist(constr(min_length=3, max_length=30), min_length=1, max_length=5000)] = None
 
 class PromoForUser(BaseModel):
     promo_id: UUID
@@ -53,20 +54,47 @@ class PromoForUser(BaseModel):
 
 class PromoReadOnly(BaseModel):
     description: constr(min_length=10, max_length=300)
-    image_url: str
+    image_url: Optional[constr(max_length=350)] = None
     target: Target
-    max_count: conint(ge=1)
-    active_from: str
-    active_until: str
+    max_count: conint(ge=0, le=100000000)
+    active_from: Optional[str] = None
+    active_until: Optional[str] = None
     mode: constr(pattern=r'^(COMMON|UNIQUE)$')
-    promo_common: Optional[str] = None
-    promo_unique: Optional[List[str]] = None
+    promo_common: Optional[constr(min_length=5, max_length=30)] = None
+    promo_unique: Optional[conlist(constr(min_length=3, max_length=30), min_length=1, max_length=5000)] = None
     promo_id: UUID
     company_id: UUID
-    company_name: str
+    name: str = Field(..., min_length=5, max_length=50)
     like_count: conint(ge=0)
     used_count: conint(ge=0)
     active: bool
+
+    @root_validator(pre=True)
+    def check_active_status(cls, values):
+        active_from = values.get('active_from')
+        active_until = values.get('active_until')
+        mode = values.get('mode')
+        max_count = values.get('max_count')
+        used_count = values.get('used_count')
+
+
+        current_date = datetime.now()
+
+        if active_from and datetime.fromisoformat(active_from) > current_date:
+            values['active'] = False
+
+        elif active_until and datetime.fromisoformat(active_until) < current_date:
+            values['active'] = False
+
+        elif mode == 'COMMON' and used_count is not None and max_count is not None and used_count >= max_count:
+            values['active'] = False
+
+        elif mode == 'UNIQUE' and not values.get('promo_unique'):
+            values['active'] = False
+        else:
+            values['active'] = True
+
+        return values
 
 class PromoStat(BaseModel):
     activations_count: conint(ge=0)
@@ -77,7 +105,7 @@ class UserTargetSettings(BaseModel):
     age: conint(ge=0)
     country: constr(pattern=r'^[A-Za-z]{2}$')
 
-    @validator('country')
+    @field_validator('country')
     def validate_country(cls, value):
         value = value.upper()
         if not pycountry.countries.get(alpha_2=value):
@@ -101,9 +129,9 @@ class UserRegister(BaseModel):
     email: str
     password: str
 
-    @validator("password")
+    @field_validator("password")
     def validate_password(cls, v):
-        password_pattern = r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$"
+        password_pattern = r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,60}$"
         if not re.match(password_pattern, v):
             raise ValueError("Неправильный формат пароля")
         return v
@@ -112,9 +140,9 @@ class SignIn(BaseModel):
     email: EmailStr
     password: str
 
-    @validator("password")
+    @field_validator("password")
     def validate_password(cls, v):
-        password_pattern = r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$"
+        password_pattern = r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,60}$"
         if not re.match(password_pattern, v):
             raise ValueError("Неправильный формат пароля")
         return v
@@ -143,7 +171,7 @@ class CompanyCreate(BaseModel):
     email: EmailStr = Field(..., min_length=8, max_length=120)
     password: str = Field(..., min_length=8, max_length=60)
 
-    @validator("password")
+    @field_validator("password")
     def validate_password(cls, v):
         password_pattern = r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$"
         if not re.match(password_pattern, v):

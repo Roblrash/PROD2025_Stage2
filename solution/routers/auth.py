@@ -105,16 +105,14 @@ async def sign_up(
         raise HTTPException(status_code=409, detail="Email is already registered")
 
     token = create_access_token(
-        data={"sub": new_company.email, "company_id": str(uuid.uuid4())},  # Используйте UUID для токена
+        data={"sub": new_company.email, "company_id": str(uuid.uuid4())},
         expires_delta=timedelta(hours=2),
     )
 
     await save_token_to_redis(redis, new_company.id, token, ttl=7200)
 
-    # Создаем объект CompanyId
-    company_id_obj = CompanyId(company_id=uuid.uuid4())  # Генерация UUID
+    company_id_obj = CompanyId(company_id=uuid.uuid4())
 
-    # Возвращаем объект CompanyResponse
     return CompanyResponse(token=token, company_id=company_id_obj)
 
 
