@@ -1,9 +1,10 @@
-from fastapi import APIRouter, HTTPException, Depends, Request, Header
+from fastapi import APIRouter, HTTPException, Depends, Request, Security
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 from jose import jwt, JWTError, ExpiredSignatureError
 from passlib.context import CryptContext
 from typing import Dict
+from fastapi.security import APIKeyHeader
 from datetime import datetime, timedelta
 from backend.db import get_db
 from models.company import Company
@@ -50,42 +51,64 @@ async def invalidate_existing_token(redis: Redis, company_id: int):
     await redis.delete(key)
 
 
+auth_header = APIKeyHeader(name="Authorization")
+
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+
 async def get_current_company(
-        authorization: str = Header(...),
+        authorization: str = Security(auth_header),
         db: AsyncSession = Depends(get_db),
         redis: Redis = Depends(get_redis)
 ) -> Company:
+    logging.debug(f"Authorization header: {authorization}")
+
     if not authorization or not authorization.startswith("Bearer "):
+        logging.error("Authorization header missing or invalid format")
         raise HTTPException(status_code=401, detail="Authorization header missing or invalid format")
 
     token = authorization.split(" ")[1]
+
+    logging.debug(f"Decoded token: {token}")
 
     try:
         payload = jwt.decode(token, settings.RANDOM_SECRET, algorithms=["HS256"])
         company_id: Optional[int] = payload.get("company_id")
         if company_id is None:
+            logging.error("Invalid token: 'company_id' not found")
             raise HTTPException(status_code=401, detail="Invalid token: 'company_id' not found")
     except ExpiredSignatureError:
+        logging.error("Token has expired")
         raise HTTPException(status_code=401, detail="Token has expired")
     except JWTError as e:
+        logging.error(f"Invalid token: {str(e)}")
         raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
 
     key = f"company:{company_id}:token"
+    logging.debug(f"Redis key: {key}")
+
     stored_token = await redis.get(key)
 
     if not stored_token:
+        logging.error(f"Token not found in Redis for key: {key}")
         raise HTTPException(status_code=401, detail="Token not found in Redis")
 
     if stored_token.decode("utf-8") != token:
+        logging.error(f"Token mismatch: stored token {stored_token.decode('utf-8')} != provided token {token}")
         raise HTTPException(status_code=401, detail="Token mismatch or not valid")
 
     result = await db.execute(select(Company).where(Company.id == company_id))
     company = result.scalar()
 
     if company is None:
+        logging.error(f"Company with ID {company_id} not found")
         raise HTTPException(status_code=401, detail="Company not found")
 
+    logging.debug(f"Company found: {company}")
+
     return company
+
 
 
 @router.post("/business/auth/sign-up", response_model=CompanyResponse)

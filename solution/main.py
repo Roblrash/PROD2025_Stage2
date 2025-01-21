@@ -46,3 +46,31 @@ if __name__ == "__main__":
     uvicorn.run(app, host=server_host, port=int(server_port))
 
 
+
+#docker exec -it fastapi_db bash
+#psql -U postgres -d postgres
+#DROP SCHEMA public CASCADE;
+#CREATE SCHEMA public;
+#docker exec -it fastapi_app alembic upgrade 2025_01_20_123456
+
+
+
+#docker exec -it fastapi_app alembic revision --autogenerate -m "Initial migration"
+#docker exec -it fastapi_app alembic upgrade header
+#docker compose -f solution/docker-compose.yml build
+#docker compose -f solution/docker-compose.yml up
+#docker volume prune -f Удаляет все ненужные тома, включая том с базой данных
+
+# {
+#   "description": "Повышенный кэшбек 10% для новых клиентов банка!",
+#   "image_url": "https://cdn2.thecatapi.com/images/3lo.jpg",
+#   "target": {},
+#   "max_count": 10,
+#   "active_from": "2025-01-10",
+#   "mode": "COMMON",
+#   "promo_common": "sale-10"
+# }
+# {
+#   "email": "Roma@example.com",
+#   "password": "Roma2007!"
+# }
