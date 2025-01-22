@@ -8,10 +8,11 @@ from schemas import PromoCreate, PromoReadOnly
 from datetime import datetime
 from sqlalchemy.future import select
 from sqlalchemy.orm import class_mapper
+from sqlalchemy.dialects.postgresql import JSONB
 from datetime import date
-from sqlalchemy import func
+from sqlalchemy import func, or_, cast
 from uuid import UUID
-from pydantic import ValidationError
+
 
 router = APIRouter(prefix="/api/business/promo")
 
@@ -56,6 +57,7 @@ async def create_promo(
         activations_count=0,
         like_count=0,
         used_count=0,
+        created_at=func.now()
     )
 
     db.add(new_promo)
@@ -82,27 +84,42 @@ def remove_none_values(data):
         return [remove_none_values(item) for item in data if item is not None]
     return data
 
+
 @router.get("", response_model=List[PromoReadOnly])
 async def get_promos(
-    limit: int = Query(10, ge=1),
-    offset: int = Query(0, ge=0),
-    sort_by: Optional[str] = Query("active_from", regex="^(active_from|active_until)$"),
-    country: Optional[List[str]] = Query(None),
-    db: AsyncSession = Depends(get_db),
-    company=Depends(get_current_company),
+        limit: int = Query(10, ge=1),
+        offset: int = Query(0, ge=0),
+        sort_by: Optional[str] = Query(None, regex="^(active_from|active_until|id)$"),
+        country: Optional[List[str]] = Query(None),
+        db: AsyncSession = Depends(get_db),
+        company=Depends(get_current_company),
 ):
     query = select(PromoCode).filter(PromoCode.company_id == company.id)
 
     if country:
+        if isinstance(country, str):
+            country = country.split(",")
         lower_country = [c.lower() for c in country]
-        query = query.filter(func.lower(PromoCode.target["country"].astext).in_(lower_country))
+
+        filter_condition = or_(
+            func.jsonb_extract_path_text(
+                cast(PromoCode.target, JSONB), 'country'
+            ).is_(None),
+            func.lower(
+                func.jsonb_extract_path_text(
+                    cast(PromoCode.target, JSONB), 'country'
+                )
+            ).in_(lower_country)
+        )
+
+        query = query.filter(filter_condition)
 
     if sort_by == "active_from":
         query = query.order_by(PromoCode.active_from.desc())
     elif sort_by == "active_until":
         query = query.order_by(PromoCode.active_until.desc())
     else:
-        query = query.order_by(PromoCode.id.desc())
+        query = query.order_by(PromoCode.created_at.desc())
 
     query_with_count = query.offset(offset).limit(limit)
     result = await db.execute(query_with_count)

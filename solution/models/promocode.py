@@ -1,6 +1,7 @@
 from backend.db import Base
-from sqlalchemy import Column, Integer, String, Boolean, Date, ForeignKey, JSON
+from sqlalchemy import Column, Integer, String, Boolean, Date, ForeignKey, JSON, DateTime
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 import uuid
 
@@ -9,6 +10,7 @@ class PromoCode(Base):
     __tablename__ = "promo_codes"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    created_at = Column(DateTime, default=func.now())
     company_id = Column(UUID(as_uuid=True), ForeignKey("companies.id"), nullable=False)
     company_name = Column(String(50), nullable=False)
     promo_id = Column(UUID(as_uuid=True), unique=True, default=uuid.uuid4)
