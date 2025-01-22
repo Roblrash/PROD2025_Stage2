@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, conint, constr, field_validator, Field, conlist, root_validator, ValidationError
+from pydantic import BaseModel, EmailStr, conint, constr, field_validator, Field, conlist, model_validator
 from typing import List, Optional
 from uuid import UUID
 from datetime import date
@@ -20,8 +20,16 @@ class Target(BaseModel):
         value = value.upper()
         if not pycountry.countries.get(alpha_2=value):
             raise ValueError("Страна не существует в ISO 3166-1 alpha-2.")
-
         return value
+
+    @model_validator(mode="after")
+    def validate_age_range(cls, values):
+        age_from = values.age_from
+        age_until = values.age_until
+
+        if age_from is not None and age_until is not None and age_from > age_until:
+            raise ValueError("'age_from' cannot be greater than 'age_until'.")
+        return values
 
 class PromoPatch(BaseModel):
     description: constr(min_length=10, max_length=300)
@@ -42,6 +50,22 @@ class PromoCreate(BaseModel):
     promo_common: Optional[constr(min_length=5, max_length=30)] = None
     promo_unique: Optional[conlist(constr(min_length=3, max_length=30), min_length=1, max_length=5000)] = None
 
+    @model_validator(mode="after")
+    def validate_mode_and_promo_codes(cls, values):
+        mode = values.mode
+        promo_common = values.promo_common
+        promo_unique = values.promo_unique
+
+        if mode == "COMMON" and not promo_common:
+            raise ValueError("Field 'promo_common' is required when mode is 'COMMON'.")
+        if mode == "UNIQUE" and not promo_unique:
+            raise ValueError("Field 'promo_unique' is required when mode is 'UNIQUE'.")
+        if mode == "COMMON" and promo_unique:
+            raise ValueError("Field 'promo_unique' is not allowed when mode is 'COMMON'.")
+        if mode == "UNIQUE" and promo_common:
+            raise ValueError("Field 'promo_common' is not allowed when mode is 'UNIQUE'.")
+        return values
+
 class PromoForUser(BaseModel):
     promo_id: UUID
     company_id: UUID
@@ -59,8 +83,8 @@ class PromoReadOnly(BaseModel):
     image_url: Optional[constr(max_length=350)] = None
     target: Target
     max_count: conint(ge=0, le=100000000)
-    active_from: Optional[date] = None            # <--- changed here
-    active_until: Optional[date] = None           # <--- changed here
+    active_from: Optional[str] = None
+    active_until: Optional[str] = None
     mode: constr(pattern=r'^(COMMON|UNIQUE)$')
     promo_common: Optional[constr(min_length=5, max_length=30)] = None
     promo_unique: Optional[List[constr(min_length=3, max_length=30)]] = None
@@ -73,7 +97,6 @@ class PromoReadOnly(BaseModel):
 
     class Config:
         from_attributes = True
-
         json_encoders = {
             date: lambda v: v.strftime('%Y-%m-%d')
         }

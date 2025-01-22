@@ -26,6 +26,13 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         content={"detail": "Invalid request data"}
     )
 
+@app.exception_handler(ValueError)
+async def value_error_handler(request: Request, exc: ValueError):
+    return JSONResponse(
+        status_code=400,
+        content={"detail": str(exc)},
+    )
+
 app.include_router(auth.router)
 app.include_router(promo.router)
 

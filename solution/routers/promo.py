@@ -11,26 +11,33 @@ from sqlalchemy.orm import class_mapper
 from datetime import date
 from sqlalchemy import func
 from uuid import UUID
+from pydantic import ValidationError
 
 router = APIRouter(prefix="/api/business/promo")
 
-
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_promo(
-        promo_data: PromoCreate,
-        db: AsyncSession = Depends(get_db),
-        company=Depends(get_current_company),
+    promo_data: PromoCreate,
+    db: AsyncSession = Depends(get_db),
+    company=Depends(get_current_company),
 ) -> Dict[str, Any]:
-    promo_code = promo_data.promo_common if promo_data.mode == 'COMMON' else None
-    promo_codes = promo_data.promo_unique if promo_data.mode == 'UNIQUE' else None
-
-    description = promo_data.description if promo_data.description else None
+    promo_code = promo_data.promo_common if promo_data.mode == "COMMON" else None
+    promo_codes = promo_data.promo_unique if promo_data.mode == "UNIQUE" else None
+    image_url = promo_data.image_url if promo_data.image_url else None
 
     try:
-        active_from = datetime.strptime(promo_data.active_from, "%Y-%m-%d").date() if promo_data.active_from else None
-        active_until = datetime.strptime(promo_data.active_until, "%Y-%m-%d").date() if promo_data.active_until else None
+        active_from = (
+            datetime.strptime(promo_data.active_from, "%Y-%m-%d").date()
+            if promo_data.active_from
+            else None
+        )
+        active_until = (
+            datetime.strptime(promo_data.active_until, "%Y-%m-%d").date()
+            if promo_data.active_until
+            else None
+        )
     except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid date format for 'active_from' or 'active_until'")
+        raise HTTPException(status_code=400, detail="Invalid date format for 'active_from' or 'active_until'.")
 
     new_promo = PromoCode(
         company_id=company.id,
@@ -40,15 +47,15 @@ async def create_promo(
         promo_unique=promo_codes,
         limit=promo_data.max_count,
         max_count=promo_data.max_count,
-        target=promo_data.target.dict() if promo_data.target else {},
-        description=description,
-        image_url=promo_data.image_url,
+        target=promo_data.target.dict(),
+        description=promo_data.description,
+        image_url=image_url,
         active_from=active_from,
         active_until=active_until,
         active=True,
         activations_count=0,
         like_count=0,
-        used_count=0
+        used_count=0,
     )
 
     db.add(new_promo)
@@ -69,7 +76,6 @@ def uuid_to_str(obj):
     return obj
 
 def remove_none_values(data):
-    """Recursively remove None values from dictionaries and lists."""
     if isinstance(data, dict):
         return {k: remove_none_values(v) for k, v in data.items() if v is not None}
     elif isinstance(data, list):
@@ -88,7 +94,8 @@ async def get_promos(
     query = select(PromoCode).filter(PromoCode.company_id == company.id)
 
     if country:
-        query = query.filter(PromoCode.target["country"].astext.in_(country))
+        lower_country = [c.lower() for c in country]
+        query = query.filter(func.lower(PromoCode.target["country"].astext).in_(lower_country))
 
     if sort_by == "active_from":
         query = query.order_by(PromoCode.active_from.desc())
@@ -106,55 +113,51 @@ async def get_promos(
     )
     total_count = total_count_result.scalar() or 0
 
-    validated_promos = []
     current_date = datetime.now().date()
 
-    for promo in promos:
-        active_from = promo.active_from or current_date
-        active_until = promo.active_until or current_date
-        mode = promo.mode or "COMMON"
-        max_count = promo.max_count or 0
-        used_count = promo.used_count or 0
-
-        active_from_str = active_from.strftime("%Y-%m-%d") if isinstance(active_from, (datetime, date)) else None
-        active_until_str = active_until.strftime("%Y-%m-%d") if isinstance(active_until, (datetime, date)) else None
+    def calculate_active(promo):
+        active_from = promo.active_from or date.min
+        active_until = promo.active_until or date.max
 
         if active_from > current_date or active_until < current_date:
-            promo.active = False
-        elif mode == "COMMON" and used_count >= max_count:
-            promo.active = False
-        elif mode == "UNIQUE" and not promo.promo_unique:
-            promo.active = False
-        else:
-            promo.active = True
+            return False
+        if promo.mode == "COMMON" and promo.used_count >= promo.max_count:
+            return False
+        if promo.mode == "UNIQUE" and not promo.promo_unique:
+            return False
+        return True
 
-        validated_promos.append(
-            PromoReadOnly(
-                **{**to_dict(promo),
-                   'active_from': active_from_str,
-                   'active_until': active_until_str}
-            )
-        )
+    response_data = []
+    for promo in promos:
+        promo_data = to_dict(promo)
+
+        target = promo_data.get("target", {})
+        if isinstance(target, dict):
+            promo_data["target"] = {key: value for key, value in target.items() if value is not None}
+
+        if not promo_data["target"]:
+            promo_data["target"] = {}
+
+        if promo_data.get("mode") == "UNIQUE":
+            promo_data["max_count"] = 1
+
+        promo_data.update({
+            "active_from": promo.active_from.strftime("%Y-%m-%d") if promo.active_from else None,
+            "active_until": promo.active_until.strftime("%Y-%m-%d") if promo.active_until else None,
+            "active": calculate_active(promo),
+        })
+
+        promo_data = PromoReadOnly(**promo_data).dict(exclude_unset=True)
+
+        response_data.append(promo_data)
 
     response_data = [
-        {**promo.dict(by_alias=True),
-         **({'active_from': active_from_str} if active_from_str else {}),
-         **({'active_until': active_until_str} if active_until_str else {})}
-        for promo in validated_promos
-    ]
-
-    response_data = [
-        {key: uuid_to_str(value) for key, value in promo.items()}
+        {key: uuid_to_str(value) for key, value in promo.items() if value is not None}
         for promo in response_data
     ]
-
-    response_data = remove_none_values(response_data)
 
     return JSONResponse(
         content=response_data,
         headers={"X-Total-Count": str(total_count)},
     )
-
-
-
 
