@@ -114,6 +114,14 @@ async def get_promos(
 
         query = query.filter(filter_condition)
 
+    total_count_query = select(func.count(PromoCode.id)).filter(PromoCode.company_id == company.id)
+
+    if country:
+        total_count_query = total_count_query.filter(filter_condition)
+
+    total_count_result = await db.execute(total_count_query)
+    total_count = total_count_result.scalar() or 0
+
     if sort_by == "active_from":
         query = query.order_by(PromoCode.active_from.desc())
     elif sort_by == "active_until":
@@ -124,11 +132,6 @@ async def get_promos(
     query_with_count = query.offset(offset).limit(limit)
     result = await db.execute(query_with_count)
     promos = result.scalars().all()
-
-    total_count_result = await db.execute(
-        select(func.count(PromoCode.id)).filter(PromoCode.company_id == company.id)
-    )
-    total_count = total_count_result.scalar() or 0
 
     current_date = datetime.now().date()
 
