@@ -16,6 +16,8 @@ from uuid import UUID
 
 router = APIRouter(prefix="/api/business/promo")
 
+from fastapi import HTTPException, status
+
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_promo(
     promo_data: PromoCreate,
@@ -38,7 +40,16 @@ async def create_promo(
             else None
         )
     except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid date format for 'active_from' or 'active_until'.")
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid date format for 'active_from' or 'active_until'."
+        )
+
+    if active_from and active_until and active_from > active_until:
+        raise HTTPException(
+            status_code=400,
+            detail="'active_from' cannot be later than 'active_until'."
+        )
 
     new_promo = PromoCode(
         company_id=company.id,
