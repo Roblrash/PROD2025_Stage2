@@ -20,7 +20,7 @@ class PromoCode(Base):
     promo_unique = Column(JSON, nullable=True)
 
     description = Column(String(300), nullable=True)
-    image_url = Column(String(300), nullable=True)
+    image_url = Column(String(350), nullable=True)
     active_from = Column(Date, nullable=True)
     active_until = Column(Date, nullable=True)
 

@@ -69,7 +69,7 @@ if __name__ == "__main__":
 #docker compose -f solution/docker-compose.yml build
 #docker compose -f solution/docker-compose.yml up
 #docker volume prune -f Удаляет все ненужные тома, включая том с базой данных
-
+#
 # {
 #   "description": "Повышенный кэшбек 10% для новых клиентов банка!",
 #   "image_url": "https://cdn2.thecatapi.com/images/3lo.jpg",

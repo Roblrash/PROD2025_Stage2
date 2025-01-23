@@ -59,7 +59,7 @@ async def create_promo(
         max_count=promo_data.max_count,
         target=promo_data.target.dict(),
         description=promo_data.description,
-        image_url=image_url,
+        image_url=str(promo_data.image_url) if promo_data.image_url else None,
         active_from=active_from,
         active_until=active_until,
         active=True,
@@ -276,7 +276,8 @@ async def patch_promo(
     if promo_data.description:
         promo.description = promo_data.description
     if promo_data.image_url:
-        promo.image_url = promo_data.image_url
+        image = str(promo_data.image_url)
+        promo.image_url = image
     if promo_data.target:
         promo.target = promo_data.target.dict()
 

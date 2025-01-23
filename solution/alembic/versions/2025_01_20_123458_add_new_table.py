@@ -30,7 +30,7 @@ def upgrade():
         sa.Column('promo_common', sa.String(30), nullable=True),
         sa.Column('promo_unique', sa.JSON, nullable=True),
         sa.Column('description', sa.String(300), nullable=True),
-        sa.Column('image_url', sa.String(300), nullable=True),
+        sa.Column('image_url', sa.String(350), nullable=True),
         sa.Column('active_from', sa.Date, nullable=True),
         sa.Column('active_until', sa.Date, nullable=True),
         sa.Column('target', sa.JSON, nullable=True),
