@@ -40,23 +40,8 @@ async def create_promo(
     promo_code = promo_data.promo_common if promo_data.mode == "COMMON" else None
     promo_codes = promo_data.promo_unique if promo_data.mode == "UNIQUE" else None
     image_url = promo_data.image_url if promo_data.image_url else None
-
-    try:
-        active_from = (
-            datetime.strptime(promo_data.active_from, "%Y-%m-%d").date()
-            if promo_data.active_from
-            else None
-        )
-        active_until = (
-            datetime.strptime(promo_data.active_until, "%Y-%m-%d").date()
-            if promo_data.active_until
-            else None
-        )
-    except ValueError:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid date format for 'active_from' or 'active_until'."
-        )
+    active_until = promo_data.active_until if promo_data.active_until else None
+    active_from = promo_data.active_from if promo_data.active_from else None
 
     if active_from and active_until and active_from > active_until:
         raise HTTPException(
