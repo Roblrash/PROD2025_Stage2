@@ -206,12 +206,11 @@ async def get_promo_and_check_company(
     result = await db.execute(query)
     promo = result.scalar()
 
-    if promo.company_id != company_id:
-        raise HTTPException(status_code=403, detail="Промокод не принадлежит этой компании.")
-
-    if not promo:
+    if promo is None:
         raise HTTPException(status_code=404, detail="Промокод не найден")
 
+    if promo.company_id != company_id:
+        raise HTTPException(status_code=403, detail="Промокод не принадлежит этой компании.")
 
     return promo
 
