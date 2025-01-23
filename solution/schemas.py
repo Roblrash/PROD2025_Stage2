@@ -31,12 +31,12 @@ class Target(BaseModel):
         return values
 
 class PromoPatch(BaseModel):
-    description: constr(min_length=10, max_length=300)
-    image_url: str
-    target: Target
+    description: Optional[constr(min_length=10, max_length=300)] = None
+    image_url: Optional[constr(max_length=350)] = None
+    target: Optional[Target] = None
     max_count: Optional[conint(ge=0)] = None
-    active_from: Optional[str]
-    active_until: Optional[str]
+    active_from: Optional[str] = None
+    active_until: Optional[str] = None
 
 class PromoCreate(BaseModel):
     description: constr(min_length=10, max_length=300)
@@ -50,19 +50,25 @@ class PromoCreate(BaseModel):
     promo_unique: Optional[conlist(constr(min_length=3, max_length=30), min_length=1, max_length=5000)] = None
 
     @model_validator(mode="after")
-    def validate_mode_and_promo_codes(cls, values):
+    def validate_mode_and_dependencies(cls, values):
         mode = values.mode
         promo_common = values.promo_common
         promo_unique = values.promo_unique
+        max_count = values.max_count
 
-        if mode == "COMMON" and not promo_common:
-            raise ValueError("Field 'promo_common' is required when mode is 'COMMON'.")
-        if mode == "UNIQUE" and not promo_unique:
-            raise ValueError("Field 'promo_unique' is required when mode is 'UNIQUE'.")
-        if mode == "COMMON" and promo_unique:
-            raise ValueError("Field 'promo_unique' is not allowed when mode is 'COMMON'.")
-        if mode == "UNIQUE" and promo_common:
-            raise ValueError("Field 'promo_common' is not allowed when mode is 'UNIQUE'.")
+        if mode == "COMMON":
+            if not promo_common:
+                raise ValueError("Field 'promo_common' is required when mode is 'COMMON'.")
+            if promo_unique:
+                raise ValueError("Field 'promo_unique' is not allowed when mode is 'COMMON'.")
+        if mode == "UNIQUE":
+            if not promo_unique:
+                raise ValueError("Field 'promo_unique' is required when mode is 'UNIQUE'.")
+            if promo_common:
+                raise ValueError("Field 'promo_common' is not allowed when mode is 'UNIQUE'.")
+            if max_count != 1:
+                raise ValueError("Field 'max_count' must be 1 when mode is 'UNIQUE'.")
+
         return values
 
 class PromoForUser(BaseModel):
@@ -129,13 +135,13 @@ class UserSurname(BaseModel):
 class User(BaseModel):
     name: UserFirstName
     surname: UserSurname
-    email: EmailStr
+    email: EmailStr = Field(..., min_length=8, max_length=120)
     avatar_url: Optional[str]
     other: UserTargetSettings
 
 class UserRegister(BaseModel):
-    email: str
-    password: str
+    email: EmailStr = Field(..., min_length=8, max_length=120)
+    password: str = Field(..., min_length=8, max_length=60)
 
     @field_validator("password")
     def validate_password(cls, v):
@@ -145,8 +151,8 @@ class UserRegister(BaseModel):
         return v
 
 class SignIn(BaseModel):
-    email: EmailStr
-    password: str
+    email: EmailStr = Field(..., min_length=8, max_length=120)
+    password: str = Field(..., min_length=8, max_length=60)
 
     @field_validator("password")
     def validate_password(cls, v):

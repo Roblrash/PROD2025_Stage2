@@ -51,7 +51,7 @@ async def invalidate_existing_token(redis: Redis, company_id: int):
     await redis.delete(key)
 
 
-auth_header = APIKeyHeader(name="Authorization")
+auth_header = APIKeyHeader(name="Authorization", auto_error=False)
 
 import logging
 
