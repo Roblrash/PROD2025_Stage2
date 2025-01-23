@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, conint, constr, field_validator, Field, conlist, model_validator
+from pydantic import BaseModel, EmailStr, conint, constr, field_validator, Field, conlist, model_validator, HttpUrl
 from typing import List, Optional
 from uuid import UUID
 from datetime import date
@@ -32,22 +32,36 @@ class Target(BaseModel):
 
 class PromoPatch(BaseModel):
     description: Optional[constr(min_length=10, max_length=300)] = None
-    image_url: Optional[constr(max_length=350)] = None
+    image_url: Optional[HttpUrl] = None
     target: Optional[Target] = None
     max_count: Optional[conint(ge=0)] = None
-    active_from: Optional[str] = None
-    active_until: Optional[str] = None
+    active_from: Optional[date] = None
+    active_until: Optional[date] = None
+
+    @model_validator(mode="after")
+    def check_image_url_length(cls, values):
+        image_url = values.image_url
+        if image_url and len(str(image_url)) > 350:
+            raise ValueError("URL must be at most 350 characters long.")
+        return values
 
 class PromoCreate(BaseModel):
     description: constr(min_length=10, max_length=300)
-    image_url: Optional[constr(max_length=350)] = None
+    image_url: Optional[HttpUrl] = None
     target: Target
     max_count: conint(ge=0, le=100000000)
-    active_from: Optional[str] = None
-    active_until: Optional[str] = None
+    active_from: Optional[date] = None
+    active_until: Optional[date] = None
     mode: constr(pattern=r'^(COMMON|UNIQUE)$')
     promo_common: Optional[constr(min_length=5, max_length=30)] = None
     promo_unique: Optional[conlist(constr(min_length=3, max_length=30), min_length=1, max_length=5000)] = None
+
+    @model_validator(mode="after")
+    def check_image_url_length(cls, values):
+        image_url = values.image_url
+        if image_url and len(str(image_url)) > 350:
+            raise ValueError("URL must be at most 350 characters long.")
+        return values
 
     @model_validator(mode="after")
     def validate_mode_and_dependencies(cls, values):
@@ -76,16 +90,23 @@ class PromoForUser(BaseModel):
     company_id: UUID
     company_name: str
     description: constr(min_length=10, max_length=300)
-    image_url: str
+    image_url: Optional[HttpUrl] = None
     active: bool
     is_activated_by_user: bool
     like_count: conint(ge=0)
     is_liked_by_user: bool
     comment_count: conint(ge=0)
 
+    @model_validator(mode="after")
+    def check_image_url_length(cls, values):
+        image_url = values.image_url
+        if image_url and len(str(image_url)) > 350:
+            raise ValueError("URL must be at most 350 characters long.")
+        return values
+
 class PromoReadOnly(BaseModel):
     description: constr(min_length=10, max_length=300)
-    image_url: Optional[constr(max_length=350)] = None
+    image_url: Optional[HttpUrl] = None
     target: Target
     max_count: conint(ge=0, le=100000000)
     active_from: Optional[str] = None
@@ -99,6 +120,13 @@ class PromoReadOnly(BaseModel):
     like_count: conint(ge=0)
     used_count: conint(ge=0)
     active: bool
+
+    @model_validator(mode="after")
+    def check_image_url_length(cls, values):
+        image_url = values.image_url
+        if image_url and len(str(image_url)) > 350:
+            raise ValueError("URL must be at most 350 characters long.")
+        return values
 
     class Config:
         from_attributes = True
@@ -136,8 +164,15 @@ class User(BaseModel):
     name: UserFirstName
     surname: UserSurname
     email: EmailStr = Field(..., min_length=8, max_length=120)
-    avatar_url: Optional[str]
+    avatar_url: Optional[HttpUrl] = None
     other: UserTargetSettings
+
+    @model_validator(mode="after")
+    def check_image_url_length(cls, values):
+        avatar_url = values.avatar_url
+        if avatar_url and len(str(avatar_url)) > 350:
+            raise ValueError("URL must be at most 350 characters long.")
+        return values
 
 class UserRegister(BaseModel):
     email: EmailStr = Field(..., min_length=8, max_length=120)
