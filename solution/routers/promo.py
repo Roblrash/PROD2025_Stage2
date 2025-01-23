@@ -12,7 +12,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from datetime import date
 from sqlalchemy import func, or_, cast
 from uuid import UUID
-
+import uuid
 
 router = APIRouter(prefix="/api/business/promo")
 
@@ -81,7 +81,8 @@ async def create_promo(
         activations_count=0,
         like_count=0,
         used_count=0,
-        created_at=func.now()
+        created_at=func.now(),
+        promo_id =uuid.uuid4()
     )
 
     if not calculate_active(promo_instance):
