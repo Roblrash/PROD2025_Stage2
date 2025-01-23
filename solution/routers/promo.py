@@ -39,7 +39,7 @@ async def create_promo(
 ) -> Dict[str, Any]:
     promo_code = promo_data.promo_common if promo_data.mode == "COMMON" else None
     promo_codes = promo_data.promo_unique if promo_data.mode == "UNIQUE" else None
-    image_url = promo_data.image_url if promo_data.image_url else None
+    image_url = str(promo_data.image_url) if promo_data.image_url else None
     active_until = promo_data.active_until if promo_data.active_until else None
     active_from = promo_data.active_from if promo_data.active_from else None
 
@@ -59,7 +59,7 @@ async def create_promo(
         max_count=promo_data.max_count,
         target=promo_data.target.dict(),
         description=promo_data.description,
-        image_url=str(promo_data.image_url) if promo_data.image_url else None,
+        image_url=image_url,
         active_from=active_from,
         active_until=active_until,
         active=True,
@@ -77,7 +77,7 @@ async def create_promo(
     await db.commit()
     await db.refresh(promo_instance)
 
-    return {"id": str(promo_instance.id)}
+    return {"id": str(promo_instance.promo_id)}
 
 
 from fastapi.responses import JSONResponse
@@ -161,9 +161,6 @@ async def get_promos(
         if not promo_data["target"]:
             promo_data["target"] = {}
 
-        if promo_data.get("mode") == "UNIQUE":
-            promo_data["max_count"] = 1
-
         promo_data.update({
             "active_from": promo.active_from.strftime("%Y-%m-%d") if promo.active_from else None,
             "active_until": promo.active_until.strftime("%Y-%m-%d") if promo.active_until else None,
@@ -218,9 +215,6 @@ async def get_promo_by_id(
     if not promo_data["target"]:
         promo_data["target"] = {}
 
-    if promo_data.get("mode") == "UNIQUE":
-        promo_data["max_count"] = 1
-
     promo_data.update({
         "active_from": promo.active_from.strftime("%Y-%m-%d") if promo.active_from else None,
         "active_until": promo.active_until.strftime("%Y-%m-%d") if promo.active_until else None,
@@ -243,35 +237,12 @@ async def patch_promo(
 ):
     promo = await get_promo_and_check_company(id, company.id, db)
 
-    if promo_data.mode == "COMMON":
-        if not promo_data.promo_common:
-            raise HTTPException(
-                status_code=400,
-                detail="Field 'promo_common' is required when mode is 'COMMON'."
-            )
-        if promo_data.promo_unique:
-            raise HTTPException(
-                status_code=400,
-                detail="Field 'promo_unique' is not allowed when mode is 'COMMON'."
-            )
-    elif promo_data.mode == "UNIQUE":
-        if not promo_data.promo_unique:
-            raise HTTPException(
-                status_code=400,
-                detail="Field 'promo_unique' is required when mode is 'UNIQUE'."
-            )
-        if promo_data.promo_common:
-            raise HTTPException(
-                status_code=400,
-                detail="Field 'promo_common' is not allowed when mode is 'UNIQUE'."
-            )
+    if promo.mode == "UNIQUE":
         if promo_data.max_count != 1:
             raise HTTPException(
                 status_code=400,
                 detail="Field 'max_count' must be 1 when mode is 'UNIQUE'."
             )
-    else:
-        raise HTTPException(status_code=400, detail="Field 'mode' is required and must be 'COMMON' or 'UNIQUE'.")
 
     if promo_data.description:
         promo.description = promo_data.description
@@ -284,29 +255,17 @@ async def patch_promo(
     if promo_data.max_count is not None:
         promo.max_count = promo_data.max_count
 
-    if promo_data.active_from:
-        try:
-            promo.active_from = datetime.strptime(promo_data.active_from, "%Y-%m-%d").date()
-        except ValueError:
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid date format for 'active_from'. Expected format: YYYY-MM-DD."
-            )
-
-    if promo_data.active_until:
-        try:
-            promo.active_until = datetime.strptime(promo_data.active_until, "%Y-%m-%d").date()
-        except ValueError:
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid date format for 'active_until'. Expected format: YYYY-MM-DD."
-            )
-
     if promo_data.active_from and promo_data.active_until and promo_data.active_from > promo_data.active_until:
         raise HTTPException(
             status_code=400,
             detail="'active_from' cannot be later than 'active_until'."
         )
+
+    if promo_data.active_from:
+        promo.active_from = promo_data.active_from
+
+    if promo_data.active_until:
+        promo.active_until = promo_data.active_until
 
     if not calculate_active(promo):
         promo.active = False
@@ -318,6 +277,14 @@ async def patch_promo(
     await db.refresh(promo)
 
     promo_data = to_dict(promo)
+
+    target = promo_data.get("target", {})
+    if isinstance(target, dict):
+        promo_data["target"] = {key: value for key, value in target.items() if value is not None}
+
+    if not promo_data["target"]:
+        promo_data["target"] = {}
+
     promo_data.update({
         "active_from": promo.active_from.strftime("%Y-%m-%d") if promo.active_from else None,
         "active_until": promo.active_until.strftime("%Y-%m-%d") if promo.active_until else None,

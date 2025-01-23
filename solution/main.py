@@ -83,4 +83,19 @@ if __name__ == "__main__":
 #   "email": "Roma@example.com",
 #   "password": "Roma2007!"
 # }
-#54222fe8-2307-4a2e-b7d0-f8b9acd6f069
+#897cc5c7-1c96-48b2-acfa-6e3cfe38030c
+# {
+#   "description": "stringstri",
+#   "image_url": "https://example.com/",
+#   "target": {
+#     "age_from": 22,
+#     "age_until": 24,
+#     "country": "Ru",
+#     "categories": [
+#       "string"
+#     ]
+#   },
+#   "max_count": 10,
+#   "active_from": "2025-03-23",
+#   "active_until": "2025-04-25"
+# }
