@@ -106,7 +106,7 @@ class PromoForUser(BaseModel):
 
 class PromoReadOnly(BaseModel):
     description: constr(min_length=10, max_length=300)
-    image_url: Optional[HttpUrl] = None
+    image_url: Optional[str] = None
     target: Target
     max_count: conint(ge=0, le=100000000)
     active_from: Optional[str] = None
