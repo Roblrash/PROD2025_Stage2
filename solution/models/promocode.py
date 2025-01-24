@@ -28,7 +28,6 @@ class PromoCode(Base):
 
     limit = Column(Integer, default=0)
     max_count = Column(Integer, nullable=True)
-    activations_count = Column(Integer, default=0)
     like_count = Column(Integer, default=0)
     used_count = Column(Integer, default=0)
 

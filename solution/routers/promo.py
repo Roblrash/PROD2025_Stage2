@@ -63,7 +63,6 @@ async def create_promo(
         active_from=active_from,
         active_until=active_until,
         active=True,
-        activations_count=0,
         like_count=0,
         used_count=0,
         created_at=func.now(),
@@ -230,68 +229,71 @@ async def get_promo_by_id(
 
 @router.patch("/{id}", status_code=status.HTTP_200_OK)
 async def patch_promo(
-        promo_data: PromoPatch,
-        id: UUID = Path(...),
-        db: AsyncSession = Depends(get_db),
-        company=Depends(get_current_company),
+    promo_data: PromoPatch,
+    id: UUID = Path(...),
+    db: AsyncSession = Depends(get_db),
+    company=Depends(get_current_company),
 ):
     promo = await get_promo_and_check_company(id, company.id, db)
 
     if promo.mode == "UNIQUE":
-        if promo_data.max_count != 1:
+        if promo_data.max_count is not None and promo_data.max_count != 1:
             raise HTTPException(
                 status_code=400,
                 detail="Field 'max_count' must be 1 when mode is 'UNIQUE'."
             )
 
+    if promo.mode == "COMMON" and promo_data.max_count is not None:
+        if promo_data.max_count < promo.used_count:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Field 'max_count' cannot be less "
+                    "than the current number of activations (used_count)."
+                )
+            )
+
+        promo.max_count = promo_data.max_count
+
     if promo_data.description:
         promo.description = promo_data.description
     if promo_data.image_url:
-        image = str(promo_data.image_url)
-        promo.image_url = image
+        promo.image_url = str(promo_data.image_url)
     if promo_data.target:
         promo.target = promo_data.target.dict()
 
-    if promo_data.max_count is not None:
-        promo.max_count = promo_data.max_count
-
-    if promo_data.active_from and promo_data.active_until and promo_data.active_from > promo_data.active_until:
-        raise HTTPException(
-            status_code=400,
-            detail="'active_from' cannot be later than 'active_until'."
-        )
+    if promo_data.active_from and promo_data.active_until:
+        if promo_data.active_from > promo_data.active_until:
+            raise HTTPException(
+                status_code=400,
+                detail="'active_from' cannot be later than 'active_until'."
+            )
 
     if promo_data.active_from:
         promo.active_from = promo_data.active_from
-
     if promo_data.active_until:
         promo.active_until = promo_data.active_until
 
-    if not calculate_active(promo):
-        promo.active = False
-    else:
-        promo.active = True
+    promo.active = calculate_active(promo)
 
     db.add(promo)
     await db.commit()
     await db.refresh(promo)
 
     promo_data = to_dict(promo)
-
     target = promo_data.get("target", {})
     if isinstance(target, dict):
         promo_data["target"] = {key: value for key, value in target.items() if value is not None}
-
     if not promo_data["target"]:
         promo_data["target"] = {}
 
     promo_data.update({
         "active_from": promo.active_from.strftime("%Y-%m-%d") if promo.active_from else None,
         "active_until": promo.active_until.strftime("%Y-%m-%d") if promo.active_until else None,
-        "active": calculate_active(promo),
+        "active": promo.active,
     })
-    promo_data = PromoReadOnly(**promo_data).dict(exclude_unset=True)
 
+    promo_data = PromoReadOnly(**promo_data).dict(exclude_unset=True)
     response_data = {key: uuid_to_str(value) for key, value in promo_data.items() if value is not None}
 
     return JSONResponse(content=response_data)

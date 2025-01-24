@@ -36,7 +36,6 @@ def upgrade():
         sa.Column('target', sa.JSON, nullable=True),
         sa.Column('limit', sa.Integer, default=0),
         sa.Column('max_count', sa.Integer, nullable=True),
-        sa.Column('activations_count', sa.Integer, default=0),
         sa.Column('like_count', sa.Integer, default=0),
         sa.Column('used_count', sa.Integer, default=0),
         sa.Column('active', sa.Boolean, default=True),
