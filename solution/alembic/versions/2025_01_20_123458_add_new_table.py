@@ -1,6 +1,5 @@
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
 
@@ -10,7 +9,6 @@ branch_labels = None
 depends_on = None
 
 def upgrade():
-    # Создание таблицы companies
     op.create_table(
         'companies',
         sa.Column('id', UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True),
@@ -19,7 +17,6 @@ def upgrade():
         sa.Column('password', sa.String(60), nullable=False),
     )
 
-    # Создание таблицы promo_codes
     op.create_table(
         'promo_codes',
         sa.Column('id', UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
@@ -42,8 +39,19 @@ def upgrade():
         sa.Column('created_at', sa.TIMESTAMP, nullable=False, server_default=sa.func.now())
     )
 
+    op.create_table(
+        'users',
+        sa.Column('id', UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True),
+        sa.Column('name', sa.String(100), nullable=False),
+        sa.Column('surname', sa.String(120), nullable=False),
+        sa.Column('email', sa.String(120), unique=True, index=True, nullable=False),
+        sa.Column('password', sa.String(255), nullable=False),
+        sa.Column('avatar_url', sa.String(350), nullable=True),
+        sa.Column('other', sa.JSON, nullable=True)
+    )
 
 def downgrade():
     # Удаление таблиц
+    op.drop_table('users')
     op.drop_table('promo_codes')
     op.drop_table('companies')

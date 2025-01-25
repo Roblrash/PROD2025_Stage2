@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 import uvicorn
 from config import settings
 from backend.redis import connect, close
-from routers import auth, promo
+from routers import auth, promo, auth_user
 
 app = FastAPI()
 
@@ -35,6 +35,7 @@ async def value_error_handler(request: Request, exc: ValueError):
 
 app.include_router(auth.router)
 app.include_router(promo.router)
+app.include_router(auth_user.router)
 
 @app.get("/api/ping")
 def send():
@@ -56,8 +57,8 @@ if __name__ == "__main__":
 
 #docker exec -it fastapi_db bash
 #psql -U postgres -d postgres
-#DROP SCHEMA public CASCADE;
-#CREATE SCHEMA public;
+# DROP SCHEMA public CASCADE;
+# CREATE SCHEMA public;
 #\q
 #exit
 #docker exec -it fastapi_app alembic upgrade 2025_01_20_123456
