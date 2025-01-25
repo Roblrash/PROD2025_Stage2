@@ -52,7 +52,7 @@ async def is_liked_by_user(user_id: UUID, promo_id: UUID, db: AsyncSession) -> b
 async def get_promos(
     limit: int = Query(10, ge=1),
     offset: int = Query(0, ge=0),
-    category: Optional[str] = Query(None),
+    category: Optional[List[str]] = Query(None),
     active: Optional[bool] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user)
@@ -60,7 +60,7 @@ async def get_promos(
     query = select(PromoCode)
 
     if category:
-        query = query.filter(PromoCode.category.contains([category]))
+        query = query.filter(PromoCode.category.any(PromoCode.category.in_(category)))
 
     if active is not None:
         query = query.filter(PromoCode.active == active)
@@ -74,7 +74,7 @@ async def get_promos(
     total_count_query = select(func.count(PromoCode.id))
 
     if category:
-        total_count_query = total_count_query.filter(PromoCode.category.contains([category]))
+        total_count_query = total_count_query.filter(PromoCode.category.any(PromoCode.category.in_(category)))
 
     if active is not None:
         total_count_query = total_count_query.filter(PromoCode.active == active)
