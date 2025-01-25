@@ -90,7 +90,7 @@ class PromoForUser(BaseModel):
     company_id: UUID
     company_name: str = Field(..., min_length=5, max_length=50)
     description: constr(min_length=10, max_length=300)
-    image_url: Optional[HttpUrl] = None
+    image_url: Optional[str] = None
     active: bool
     is_activated_by_user: bool
     like_count: conint(ge=0)

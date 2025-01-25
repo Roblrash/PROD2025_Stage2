@@ -49,6 +49,7 @@ async def is_liked_by_user(user_id: UUID, promo_id: UUID, db: AsyncSession) -> b
     user = result.scalar()
     return user is not None
 
+
 @router.get("/feed", response_model=List[PromoForUser])
 async def get_promos(
     limit: int = Query(10, ge=1),
@@ -58,46 +59,51 @@ async def get_promos(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
-    from sqlalchemy import cast, String, Integer
-    from sqlalchemy.sql.functions import coalesce
+    user_country = (current_user.other.get("country") or "").lower()
+    user_age = current_user.other.get("age") or 0
 
-    user_country = current_user.other.get("country")
-    user_age = current_user.other.get("age")
-
-    if not user_country or not user_age:
-        raise HTTPException(status_code=400, detail="User country or age is missing")
+    print(f"User country: {user_country}")
+    print(f"User age: {user_age}")
+    print(f"Category filter: {category}")
+    print(f"Active filter: {active}")
 
     base_query = select(PromoCode)
-
-    if category:
-        base_query = base_query.filter(
-            PromoCode.target["categories"].contains([category])
-        )
 
     if active is not None:
         base_query = base_query.filter(PromoCode.active == active)
 
-    country_condition = or_(
-        PromoCode.target["country"].is_(None),
-        func.lower(cast(PromoCode.target["country"].op("->>")("country"), String)) == user_country.lower()
+    filter_condition_country = or_(
+        func.jsonb_extract_path_text(cast(PromoCode.target, JSONB), 'country').is_(None),
+        func.lower(func.jsonb_extract_path_text(cast(PromoCode.target, JSONB), 'country')) == user_country
     )
 
-    age_condition = and_(
-        coalesce(
-            cast(func.nullif(PromoCode.target["age_from"].op("->>")("age_from"), ''), Integer), 0
-        ) <= user_age,
+    base_query = base_query.filter(filter_condition_country)
+
+    filter_condition_age = and_(
         or_(
-            PromoCode.target["age_until"].is_(None),
-            coalesce(
-                cast(func.nullif(PromoCode.target["age_until"].op("->>")("age_until"), ''), Integer), 0
-            ) >= user_age
+            func.jsonb_extract_path_text(cast(PromoCode.target, JSONB), 'age_from').is_(None),
+            func.cast(func.jsonb_extract_path_text(cast(PromoCode.target, JSONB), 'age_from'), Integer) <= user_age
+        ),
+        or_(
+            func.jsonb_extract_path_text(cast(PromoCode.target, JSONB), 'age_until').is_(None),
+            func.cast(func.jsonb_extract_path_text(cast(PromoCode.target, JSONB), 'age_until'), Integer) >= user_age
         )
     )
 
-    base_query = base_query.filter(country_condition, age_condition)
+    base_query = base_query.filter(filter_condition_age)
 
-    total_count_query = select(func.count(PromoCode.id)).filter(*base_query._where_criteria)
-    total_count_result = await db.execute(total_count_query)
+    if category:
+        category = category.lower()
+
+        filter_condition_category = or_(
+            func.jsonb_extract_path_text(cast(PromoCode.target, JSONB), 'categories').is_(None),
+            func.lower(func.jsonb_extract_path_text(cast(PromoCode.target, JSONB), 'categories')).contains(category)
+        )
+
+        base_query = base_query.filter(filter_condition_category)
+
+    count_query = base_query.with_only_columns(func.count(PromoCode.id)).order_by(None)
+    total_count_result = await db.execute(count_query)
     total_count = total_count_result.scalar() or 0
 
     final_query = base_query.order_by(PromoCode.created_at.desc()).offset(offset).limit(limit)
