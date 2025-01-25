@@ -71,7 +71,7 @@ async def get_promos(
     result = await db.execute(query_with_count)
     promos = result.scalars().all()
 
-    total_count_result = await db.execute(select(func.count(PromoCode.id)))
+    total_count_result = await db.execute(query.with_entities(func.count(PromoCode.id)))
     total_count = total_count_result.scalar() or 0
 
     response_data = []
