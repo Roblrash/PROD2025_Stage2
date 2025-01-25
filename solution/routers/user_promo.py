@@ -71,7 +71,15 @@ async def get_promos(
     result = await db.execute(query_with_count)
     promos = result.scalars().all()
 
-    total_count_result = await db.execute(select(func.count(PromoCode.id)).select_from(PromoCode).filter(query._whereclause))
+    total_count_query = select(func.count(PromoCode.id))
+
+    if category:
+        total_count_query = total_count_query.filter(PromoCode.category.contains([category]))
+
+    if active is not None:
+        total_count_query = total_count_query.filter(PromoCode.active == active)
+
+    total_count_result = await db.execute(total_count_query)
     total_count = total_count_result.scalar() or 0
 
     response_data = []
@@ -100,6 +108,7 @@ async def get_promos(
         content=response_data,
         headers={"X-Total-Count": str(total_count)}
     )
+
 
 @router.get("/promo/{id}", response_model=PromoForUser)
 async def get_promo_by_id(
