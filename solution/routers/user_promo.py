@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query, HTTPException, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import func, or_, Integer
+from sqlalchemy import func, or_, Integer, String, cast
 from sqlalchemy.orm import class_mapper
 from typing import List, Optional
 from uuid import UUID
@@ -78,13 +78,13 @@ async def get_promos(
 
     base_query = base_query.filter(
         or_(
-            PromoCode.target["country"].astext == user_country,
+            cast(PromoCode.target["country"], String) == user_country,
             PromoCode.target["country"].is_(None)
         ),
-        PromoCode.target["age_from"].astext.cast(Integer) <= user_age,
+        cast(PromoCode.target["age_from"], Integer) <= user_age,
         or_(
             PromoCode.target["age_until"].is_(None),
-            PromoCode.target["age_until"].astext.cast(Integer) >= user_age
+            cast(PromoCode.target["age_until"], Integer) >= user_age
         )
     )
 
