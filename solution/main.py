@@ -66,7 +66,6 @@ if __name__ == "__main__":
 #docker exec -it fastapi_app alembic upgrade 2025_01_20_123456
 
 
-
 #docker exec -it fastapi_app alembic revision --autogenerate -m "Initial migration"
 #docker exec -it fastapi_app alembic upgrade header
 #docker compose -f solution/docker-compose.yml build
