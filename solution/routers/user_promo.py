@@ -12,7 +12,7 @@ from schemas import  PromoForUser
 from datetime import datetime
 from starlette.responses import JSONResponse
 
-router = APIRouter(prefix="/api")
+router = APIRouter(prefix="/api/user")
 
 def calculate_active(promo):
     current_date = datetime.now().date()
@@ -35,7 +35,7 @@ def uuid_to_str(obj):
         return str(obj)
     return obj
 
-@router.get("/user/feed", response_model=List[PromoForUser])
+@router.get("/feed", response_model=List[PromoForUser])
 async def get_promos(
     limit: int = Query(10, ge=1),
     offset: int = Query(0, ge=0),
@@ -83,7 +83,7 @@ async def get_promos(
         headers={"X-Total-Count": str(total_count)},
     )
 
-@router.get("/{id}", response_model=PromoForUser)
+@router.get("/promo/{id}", response_model=PromoForUser)
 async def get_promo_by_id(
     id: UUID = Path(...),
     db: AsyncSession = Depends(get_db),
