@@ -95,8 +95,13 @@ async def get_promos(
     if category:
         category = category.lower()
 
-        filter_condition_category = or_(
-            func.jsonb_extract_path_text(cast(PromoCode.target, JSONB), 'categories').is_(None),
+        filter_condition_category = and_(
+            func.jsonb_extract_path_text(cast(PromoCode.target, JSONB), 'categories').isnot(None),
+            func.jsonb_extract_path_text(cast(PromoCode.target, JSONB), 'categories').notin_([""])
+        )
+
+        filter_condition_category = and_(
+            filter_condition_category,
             func.lower(func.jsonb_extract_path_text(cast(PromoCode.target, JSONB), 'categories')).contains(category)
         )
 
