@@ -16,7 +16,7 @@ import logging
 def get_redis(request: Request) -> Redis:
     return request.app.state.redis
 
-router = APIRouter(prefix="/user/auth")
+router = APIRouter(prefix="/api/user/auth")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 logging.basicConfig(level=logging.DEBUG)
 
