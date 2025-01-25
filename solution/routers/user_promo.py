@@ -48,39 +48,43 @@ async def is_liked_by_user(user_id: UUID, promo_id: UUID, db: AsyncSession) -> b
     user = result.scalar()
     return user is not None
 
+
 @router.get("/feed", response_model=List[PromoForUser])
 async def get_promos(
-    limit: int = Query(10, ge=1),
-    offset: int = Query(0, ge=0),
-    category: Optional[str] = Query(None),
-    active: Optional[bool] = Query(None),
-    db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_current_user)
+        limit: int = Query(10, ge=1),
+        offset: int = Query(0, ge=0),
+        category: Optional[str] = Query(None),
+        active: Optional[bool] = Query(None),
+        db: AsyncSession = Depends(get_db),
+        current_user=Depends(get_current_user)
 ):
-    query = select(PromoCode)
+    base_query = select(PromoCode)
 
     if category:
-        query = query.filter(PromoCode.category.any(PromoCode.category == category))
+        base_query = base_query.filter(
+            PromoCode.category.any(PromoCode.category == category)
+        )
 
     if active is not None:
-        query = query.filter(PromoCode.active == active)
+        base_query = base_query.filter(PromoCode.active == active)
 
-    query = query.order_by(PromoCode.created_at.desc())
-
-    query_with_count = query.offset(offset).limit(limit)
-    result = await db.execute(query_with_count)
-    promos = result.scalars().all()
-
-    total_count_query = select(func.count(PromoCode.id))
-
-    if category:
-        total_count_query = total_count_query.filter(PromoCode.category.any(PromoCode.category == category))
-
-    if active is not None:
-        total_count_query = total_count_query.filter(PromoCode.active == active)
+    total_count_query = (
+        select(func.count(PromoCode.id))
+        .select_from(PromoCode)
+        .filter(*base_query._where_criteria)
+    )
 
     total_count_result = await db.execute(total_count_query)
     total_count = total_count_result.scalar() or 0
+
+    final_query = (
+        base_query.order_by(PromoCode.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+
+    result = await db.execute(final_query)
+    promos = result.scalars().all()
 
     response_data = []
     for promo in promos:
@@ -96,13 +100,11 @@ async def get_promos(
         })
 
         promo_data = PromoForUser(**promo_data).dict(exclude_unset=True)
+        promo_data = {
+            key: uuid_to_str(value) for key, value in promo_data.items() if value is not None
+        }
 
         response_data.append(promo_data)
-
-    response_data = [
-        {key: uuid_to_str(value) for key, value in promo.items() if value is not None}
-        for promo in response_data
-    ]
 
     return JSONResponse(
         content=response_data,
