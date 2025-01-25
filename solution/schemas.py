@@ -148,10 +148,8 @@ class UserTargetSettings(BaseModel):
         if value is None:
             return value
 
-        value = value.upper()
-        if not pycountry.countries.get(alpha_2=value):
+        if not pycountry.countries.get(alpha_2=value.upper()):
             raise ValueError("Страна не существует в ISO 3166-1 alpha-2.")
-
         return value
 
 class User(BaseModel):
