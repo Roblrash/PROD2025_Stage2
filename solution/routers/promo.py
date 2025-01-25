@@ -6,6 +6,7 @@ from routers.auth import get_current_company
 from models.promocode import PromoCode
 from schemas import PromoCreate, PromoReadOnly, PromoPatch
 from datetime import datetime
+from fastapi.responses import JSONResponse
 from sqlalchemy.future import select
 from sqlalchemy.orm import class_mapper
 from sqlalchemy.dialects.postgresql import JSONB
@@ -79,7 +80,6 @@ async def create_promo(
     return {"id": str(promo_instance.promo_id)}
 
 
-from fastapi.responses import JSONResponse
 
 def to_dict(obj):
     return {column.name: getattr(obj, column.name) for column in class_mapper(obj.__class__).columns}

@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 import uvicorn
 from config import settings
 from backend.redis import connect, close
-from routers import auth, promo, auth_user
+from routers import auth, promo, auth_user, user_profile
 
 app = FastAPI()
 
@@ -36,6 +36,7 @@ async def value_error_handler(request: Request, exc: ValueError):
 app.include_router(auth.router)
 app.include_router(promo.router)
 app.include_router(auth_user.router)
+app.include_router(user_profile.router)
 
 @app.get("/api/ping")
 def send():
