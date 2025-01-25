@@ -36,7 +36,8 @@ def upgrade():
         sa.Column('like_count', sa.Integer, default=0),
         sa.Column('used_count', sa.Integer, default=0),
         sa.Column('active', sa.Boolean, default=True),
-        sa.Column('created_at', sa.TIMESTAMP, nullable=False, server_default=sa.func.now())
+        sa.Column('created_at', sa.TIMESTAMP, nullable=False, server_default=sa.func.now()),
+        sa.Column('comment_count', sa.Integer, default=0)
     )
 
     op.create_table(

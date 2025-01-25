@@ -67,7 +67,8 @@ async def create_promo(
         like_count=0,
         used_count=0,
         created_at=func.now(),
-        promo_id =uuid.uuid4()
+        promo_id =uuid.uuid4(),
+        comment_count=0
     )
 
     if not calculate_active(promo_instance):

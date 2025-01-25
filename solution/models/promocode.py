@@ -30,6 +30,7 @@ class PromoCode(Base):
     max_count = Column(Integer, nullable=True)
     like_count = Column(Integer, default=0)
     used_count = Column(Integer, default=0)
+    comment_count = Column(Integer, default=0)
 
     active = Column(Boolean, default=True)
 

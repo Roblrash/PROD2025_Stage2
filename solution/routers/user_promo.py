@@ -7,7 +7,8 @@ from typing import List, Optional
 from uuid import UUID
 from backend.db import get_db
 from routers.auth_user import get_current_user
-from models import PromoCode
+from models.promocode import PromoCode
+from models.user import User, user_activated_promos, user_liked_promos
 from schemas import  PromoForUser
 from datetime import datetime
 from starlette.responses import JSONResponse
@@ -34,6 +35,18 @@ def uuid_to_str(obj):
     if isinstance(obj, UUID):
         return str(obj)
     return obj
+
+async def is_activated_by_user(user_id: UUID, promo_id: UUID, db: AsyncSession) -> bool:
+    query = select(User).where(User.id == user_id).join(user_activated_promos).filter(PromoCode.id == promo_id)
+    result = await db.execute(query)
+    user = result.scalar()
+    return user is not None
+
+async def is_liked_by_user(user_id: UUID, promo_id: UUID, db: AsyncSession) -> bool:
+    query = select(User).where(User.id == user_id).join(user_liked_promos).filter(PromoCode.id == promo_id)
+    result = await db.execute(query)
+    user = result.scalar()
+    return user is not None
 
 @router.get("/feed", response_model=List[PromoForUser])
 async def get_promos(
@@ -65,8 +78,13 @@ async def get_promos(
     for promo in promos:
         promo_data = to_dict(promo)
 
+        is_activated = await is_activated_by_user(current_user.id, promo.id, db)
+        is_liked = await is_liked_by_user(current_user.id, promo.id, db)
+
         promo_data.update({
             "active": calculate_active(promo),
+            "is_activated_by_user": is_activated,
+            "is_liked_by_user": is_liked
         })
 
         promo_data = PromoForUser(**promo_data).dict(exclude_unset=True)
@@ -80,7 +98,7 @@ async def get_promos(
 
     return JSONResponse(
         content=response_data,
-        headers={"X-Total-Count": str(total_count)},
+        headers={"X-Total-Count": str(total_count)}
     )
 
 @router.get("/promo/{id}", response_model=PromoForUser)
@@ -89,7 +107,6 @@ async def get_promo_by_id(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-
     query = select(PromoCode).where(PromoCode.promo_id == id)
     result = await db.execute(query)
     promo = result.scalar()
@@ -99,8 +116,13 @@ async def get_promo_by_id(
 
     promo_data = to_dict(promo)
 
+    is_activated = await is_activated_by_user(current_user.id, promo.id, db)
+    is_liked = await is_liked_by_user(current_user.id, promo.id, db)
+
     promo_data.update({
         "active": calculate_active(promo),
+        "is_activated_by_user": is_activated,
+        "is_liked_by_user": is_liked
     })
 
     promo_data = PromoForUser(**promo_data).dict(exclude_unset=True)
