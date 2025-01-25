@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query, HTTPException, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import class_mapper
 from typing import List, Optional
 from uuid import UUID
@@ -68,9 +68,21 @@ async def get_promos(
     if active is not None:
         base_query = base_query.filter(PromoCode.active == active)
 
+    base_query = base_query.filter(
+        or_(
+            PromoCode.target_country == current_user.country,
+            PromoCode.target_country.is_(None)
+        ),
+        PromoCode.target_age_from <= current_user.age,
+        or_(
+            PromoCode.target_age_until.is_(None),
+            PromoCode.target_age_until >= current_user.age
+        )
+    )
+
+
     total_count_query = (
         select(func.count(PromoCode.id))
-        .select_from(PromoCode)
         .filter(*base_query._where_criteria)
     )
 
