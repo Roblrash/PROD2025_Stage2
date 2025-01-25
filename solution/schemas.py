@@ -88,7 +88,7 @@ class PromoCreate(BaseModel):
 class PromoForUser(BaseModel):
     promo_id: UUID
     company_id: UUID
-    company_name: str
+    company_name: str = Field(..., min_length=5, max_length=50)
     description: constr(min_length=10, max_length=300)
     image_url: Optional[HttpUrl] = None
     active: bool
