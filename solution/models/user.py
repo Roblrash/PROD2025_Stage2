@@ -4,6 +4,7 @@ from sqlalchemy.orm import relationship
 import uuid
 from backend.db import Base
 
+# Основная модель User
 class User(Base):
     __tablename__ = "users"
 
@@ -15,19 +16,23 @@ class User(Base):
     avatar_url = Column(String(350), nullable=True)
     other = Column(JSON, nullable=True)
 
-    activated_promos = relationship("PromoCode", secondary="user_activated_promos", backref="users_activated")
-    liked_promos = relationship("PromoCode", secondary="user_liked_promos", backref="users_liked")
+    activated_promos = relationship(
+        "PromoCode", secondary="user_activated_promos", backref="users_activated"
+    )
+    liked_promos = relationship(
+        "PromoCode", secondary="user_liked_promos", backref="users_liked"
+    )
 
 user_activated_promos = Table(
     'user_activated_promos',
     Base.metadata,
     Column('user_id', UUID(as_uuid=True), ForeignKey('users.id', ondelete="CASCADE"), primary_key=True),
-    Column('promo_id', UUID(as_uuid=True), ForeignKey('promocodes.id', ondelete="CASCADE"), primary_key=True)
+    Column('promo_id', UUID(as_uuid=True), ForeignKey('promo_codes.promo_id', ondelete="CASCADE"), primary_key=True)
 )
 
 user_liked_promos = Table(
     'user_liked_promos',
     Base.metadata,
     Column('user_id', UUID(as_uuid=True), ForeignKey('users.id', ondelete="CASCADE"), primary_key=True),
-    Column('promo_id', UUID(as_uuid=True), ForeignKey('promocodes.id', ondelete="CASCADE"), primary_key=True)
+    Column('promo_id', UUID(as_uuid=True), ForeignKey('promo_codes.promo_id', ondelete="CASCADE"), primary_key=True)
 )

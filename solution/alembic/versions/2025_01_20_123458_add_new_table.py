@@ -10,6 +10,17 @@ depends_on = None
 
 def upgrade():
     op.create_table(
+        'users',
+        sa.Column('id', UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True),
+        sa.Column('name', sa.String(100), nullable=False),
+        sa.Column('surname', sa.String(120), nullable=False),
+        sa.Column('email', sa.String(120), unique=True, index=True, nullable=False),
+        sa.Column('password', sa.String(255), nullable=False),
+        sa.Column('avatar_url', sa.String(350), nullable=True),
+        sa.Column('other', sa.JSON, nullable=True)
+    )
+
+    op.create_table(
         'companies',
         sa.Column('id', UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True),
         sa.Column('name', sa.String(50), nullable=False),
@@ -41,18 +52,22 @@ def upgrade():
     )
 
     op.create_table(
-        'users',
-        sa.Column('id', UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True),
-        sa.Column('name', sa.String(100), nullable=False),
-        sa.Column('surname', sa.String(120), nullable=False),
-        sa.Column('email', sa.String(120), unique=True, index=True, nullable=False),
-        sa.Column('password', sa.String(255), nullable=False),
-        sa.Column('avatar_url', sa.String(350), nullable=True),
-        sa.Column('other', sa.JSON, nullable=True)
+        'user_activated_promos',
+        sa.Column('user_id', UUID(as_uuid=True), sa.ForeignKey('users.id', ondelete='CASCADE'), primary_key=True),
+        sa.Column('promo_id', UUID(as_uuid=True), sa.ForeignKey('promo_codes.promo_id', ondelete='CASCADE'), primary_key=True)
     )
 
+    op.create_table(
+        'user_liked_promos',
+        sa.Column('user_id', UUID(as_uuid=True), sa.ForeignKey('users.id', ondelete='CASCADE'), primary_key=True),
+        sa.Column('promo_id', UUID(as_uuid=True), sa.ForeignKey('promo_codes.promo_id', ondelete='CASCADE'), primary_key=True)
+    )
+
+
 def downgrade():
-    # Удаление таблиц
+    op.drop_table('user_activated_promos')
+    op.drop_table('user_liked_promos')
     op.drop_table('users')
     op.drop_table('promo_codes')
     op.drop_table('companies')
+
