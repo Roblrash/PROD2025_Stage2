@@ -1,4 +1,3 @@
-import json
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -13,6 +12,7 @@ from schemas import PromoForUser
 from backend.db import get_db
 from routers.auth_user import get_current_user
 from redis.asyncio import Redis
+import json
 
 router = APIRouter(prefix="/api/user")
 
