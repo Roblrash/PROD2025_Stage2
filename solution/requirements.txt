@@ -13,3 +13,4 @@ gunicorn
 redis
 python-multipart
 pycountry
+aiohttp
