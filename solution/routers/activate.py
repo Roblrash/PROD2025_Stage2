@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, Path, Query
+import json
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from uuid import UUID
@@ -11,8 +12,12 @@ from models.user import User, user_activated_promos
 from schemas import PromoForUser
 from backend.db import get_db
 from routers.auth_user import get_current_user
+from redis.asyncio import Redis
 
 router = APIRouter(prefix="/api/user")
+
+def get_redis(request: Request) -> Redis:
+    return request.app.state.redis
 
 @router.get("/promo/history", response_model=List[PromoForUser])
 async def get_promo_history(
@@ -34,11 +39,36 @@ async def get_promo_history(
 
     return promo_history
 
+async def call_antifraud_service(user_email: str, promo_id: UUID, redis: Redis) -> dict:
+    cache_key = f"antifraud:{user_email}:{promo_id}"
+    cached_result = await redis.get(cache_key)
+
+    if cached_result:
+        return json.loads(cached_result)
+
+    antifraud_url = f"{settings.ANTIFRAUD_ADDRESS}/api/validate"
+    payload = {"user_email": user_email, "promo_id": str(promo_id)}
+
+    # Reuse session for the retry attempts
+    async with aiohttp.ClientSession() as session:
+        for _ in range(2):
+            async with session.post(antifraud_url, json=payload,
+                                    headers={"Content-Type": "application/json"}) as response:
+                if response.status == 200:
+                    result = await response.json()
+                    if "cache_until" in result:
+                        cache_duration = (datetime.fromisoformat(result["cache_until"]) - datetime.utcnow()).total_seconds()
+                        await redis.set(cache_key, json.dumps(result), ex=int(cache_duration))
+                    return result
+
+    raise HTTPException(status_code=403, detail="Ошибка антифрод-сервиса.")
+
 @router.post("/promo/{id}/activate")
 async def activate_promo(
         id: UUID = Path(...),
         db: AsyncSession = Depends(get_db),
         current_user=Depends(get_current_user),
+        redis: Redis = Depends(get_redis)
 ):
     user_query = select(User).where(User.id == current_user.id)
     user_result = await db.execute(user_query)
@@ -84,7 +114,7 @@ async def activate_promo(
     if promo.mode == "UNIQUE" and not promo.promo_unique:
         raise HTTPException(status_code=403, detail="Нет доступных уникальных промокодов.")
 
-    antifraud_result = await call_antifraud_service(current_user.email, promo.promo_id)
+    antifraud_result = await call_antifraud_service(current_user.email, promo.promo_id, redis)
     if not antifraud_result.get("ok", False):
         raise HTTPException(status_code=403, detail="Активировать промокод запрещено антифрод-сервисом.")
 
@@ -101,17 +131,3 @@ async def activate_promo(
     await db.commit()
 
     return {"promo": promo_value}
-
-
-async def call_antifraud_service(user_email: str, promo_id: UUID) -> dict:
-    antifraud_url = f"{settings.ANTIFRAUD_ADDRESS}/api/validate"
-    payload = {"user_email": user_email, "promo_id": str(promo_id)}
-
-    for _ in range(2):
-        async with aiohttp.ClientSession() as session:
-            async with session.post(antifraud_url, json=payload,
-                                    headers={"Content-Type": "application/json"}) as response:
-                if response.status == 200:
-                    return await response.json()
-    raise HTTPException(status_code=403, detail="Ошибка антифрод-сервиса.")
-
