@@ -49,7 +49,6 @@ async def call_antifraud_service(user_email: str, promo_id: UUID, redis: Redis) 
     antifraud_url = f"{settings.ANTIFRAUD_ADDRESS}/api/validate"
     payload = {"user_email": user_email, "promo_id": str(promo_id)}
 
-    # Reuse session for the retry attempts
     async with aiohttp.ClientSession() as session:
         for _ in range(2):
             async with session.post(antifraud_url, json=payload,
