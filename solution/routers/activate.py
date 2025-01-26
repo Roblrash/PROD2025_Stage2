@@ -1,26 +1,27 @@
-from fastapi import APIRouter, Depends, HTTPException, Path
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from uuid import UUID
 from datetime import datetime, date
 import aiohttp
+from typing import List
 from config import settings
 from models.promocode import PromoCode
 from models.user import User, user_activated_promos
+from schemas import PromoForUser
 from backend.db import get_db
 from routers.auth_user import get_current_user
-
 
 router = APIRouter(prefix="/api/user")
 
 
 @router.post("/promo/{id}/activate")
 async def activate_promo(
-    id: UUID = Path(...),
-    db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_current_user),
+        id: UUID = Path(...),
+        db: AsyncSession = Depends(get_db),
+        current_user=Depends(get_current_user),
 ):
-    user_query = select(User).where(User.email == current_user.email)
+    user_query = select(User).where(User.id == current_user.id)
     user_result = await db.execute(user_query)
     user = user_result.scalar()
     if user is None:
@@ -45,6 +46,7 @@ async def activate_promo(
 
     if active_from > current_date or active_until < current_date:
         raise HTTPException(status_code=403, detail="Промокод не активен в текущий период.")
+
     if promo.target.get("country"):
         target_country = promo.target["country"].lower()
         user_country = user.other.get("country", "").lower()
@@ -59,11 +61,12 @@ async def activate_promo(
 
     if promo.mode == "COMMON" and promo.used_count >= promo.max_count:
         raise HTTPException(status_code=403, detail="Лимит использования промокода исчерпан.")
+
     if promo.mode == "UNIQUE" and not promo.promo_unique:
         raise HTTPException(status_code=403, detail="Нет доступных уникальных промокодов.")
 
     antifraud_result = await call_antifraud_service(current_user.email, promo.promo_id)
-    if not antifraud_result["ok"]:
+    if not antifraud_result.get("ok", False):
         raise HTTPException(status_code=403, detail="Активировать промокод запрещено антифрод-сервисом.")
 
     if not activation_exists:
@@ -78,18 +81,38 @@ async def activate_promo(
 
     await db.commit()
 
-    return {
-        "promo": promo_value
-    }
+    return {"promo": promo_value}
 
 
-async def call_antifraud_service(user_email: str, promo_id: str) -> dict:
+async def call_antifraud_service(user_email: str, promo_id: UUID) -> dict:
     antifraud_url = f"{settings.ANTIFRAUD_ADDRESS}/api/validate"
     payload = {"user_email": user_email, "promo_id": str(promo_id)}
 
     for _ in range(2):
         async with aiohttp.ClientSession() as session:
-            async with session.post(antifraud_url, json=payload, headers={"Content-Type": "application/json"}) as response:
+            async with session.post(antifraud_url, json=payload,
+                                    headers={"Content-Type": "application/json"}) as response:
                 if response.status == 200:
                     return await response.json()
     raise HTTPException(status_code=403, detail="Ошибка антифрод-сервиса.")
+
+
+@router.get("/promo/history", response_model=List[PromoForUser])
+async def get_promo_history(
+        limit: int = Query(10, ge=1),
+        offset: int = Query(0, ge=0),
+        db: AsyncSession = Depends(get_db),
+        current_user=Depends(get_current_user)
+):
+    user_query = select(User).where(User.id == current_user.id)
+    user_result = await db.execute(user_query)
+    user = user_result.scalar()
+
+    promo_query = select(PromoCode).join(user_activated_promos).where(
+        user_activated_promos.c.user_id == user.id
+    ).order_by(user_activated_promos.c.activation_date.desc()).limit(limit).offset(offset)
+
+    promo_result = await db.execute(promo_query)
+    promo_history = promo_result.scalars().all()
+
+    return promo_history

@@ -36,3 +36,4 @@ class PromoCode(Base):
 
     company = relationship("Company", back_populates="promos")
     comments = relationship("Commentary", back_populates="promo")
+    users_activated = relationship("User", secondary="user_activated_promos", backref="users_activated_promo")

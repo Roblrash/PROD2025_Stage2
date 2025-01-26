@@ -1,7 +1,8 @@
-from sqlalchemy import Column, String, JSON, ForeignKey, Table
+from sqlalchemy import Column, String, JSON, ForeignKey, Table, DateTime
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 import uuid
+from datetime import datetime
 from backend.db import Base
 
 class User(Base):
@@ -16,7 +17,7 @@ class User(Base):
     other = Column(JSON, nullable=True)
 
     activated_promos = relationship(
-        "PromoCode", secondary="user_activated_promos", backref="users_activated"
+        "PromoCode", secondary="user_activated_promos", backref="users_activated_promo"
     )
     liked_promos = relationship(
         "PromoCode", secondary="user_liked_promos", backref="users_liked"
@@ -26,7 +27,8 @@ user_activated_promos = Table(
     'user_activated_promos',
     Base.metadata,
     Column('user_id', UUID(as_uuid=True), ForeignKey('users.id', ondelete="CASCADE"), primary_key=True),
-    Column('promo_id', UUID(as_uuid=True), ForeignKey('promo_codes.promo_id', ondelete="CASCADE"), primary_key=True)
+    Column('promo_id', UUID(as_uuid=True), ForeignKey('promo_codes.promo_id', ondelete="CASCADE"), primary_key=True),
+    Column('activation_date', DateTime, default=datetime.utcnow)
 )
 
 user_liked_promos = Table(
