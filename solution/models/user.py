@@ -4,7 +4,6 @@ from sqlalchemy.orm import relationship
 import uuid
 from backend.db import Base
 
-# Основная модель User
 class User(Base):
     __tablename__ = "users"
 

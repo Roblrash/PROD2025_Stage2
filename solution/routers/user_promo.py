@@ -38,13 +38,13 @@ def uuid_to_str(obj):
     return obj
 
 async def is_activated_by_user(user_id: UUID, promo_id: UUID, db: AsyncSession) -> bool:
-    query = select(User).where(User.id == user_id).join(user_activated_promos).filter(PromoCode.id == promo_id)
+    query = select(User).where(User.id == user_id).join(user_activated_promos).filter(PromoCode.promo_id == promo_id)
     result = await db.execute(query)
     user = result.scalar()
     return user is not None
 
 async def is_liked_by_user(user_id: UUID, promo_id: UUID, db: AsyncSession) -> bool:
-    query = select(User).where(User.id == user_id).join(user_liked_promos).filter(PromoCode.id == promo_id)
+    query = select(User).where(User.id == user_id).join(user_liked_promos).filter(PromoCode.promo_id == promo_id)
     result = await db.execute(query)
     user = result.scalar()
     return user is not None
@@ -118,8 +118,8 @@ async def get_promos(
     response_data = []
     for promo in promos:
         promo_data = to_dict(promo)
-        is_activated = await is_activated_by_user(current_user.id, promo.id, db)
-        is_liked = await is_liked_by_user(current_user.id, promo.id, db)
+        is_activated = await is_activated_by_user(current_user.id, promo.promo_id, db)
+        is_liked = await is_liked_by_user(current_user.id, promo.promo_id, db)
 
         promo_data.update({
             "active": calculate_active(promo),
@@ -155,8 +155,8 @@ async def get_promo_by_id(
 
     promo_data = to_dict(promo)
 
-    is_activated = await is_activated_by_user(current_user.id, promo.id, db)
-    is_liked = await is_liked_by_user(current_user.id, promo.id, db)
+    is_activated = await is_activated_by_user(current_user.id, promo.promo_id, db)
+    is_liked = await is_liked_by_user(current_user.id, promo.promo_id, db)
 
     promo_data.update({
         "active": calculate_active(promo),
@@ -169,3 +169,72 @@ async def get_promo_by_id(
     response_data = {key: uuid_to_str(value) for key, value in promo_data.items() if value is not None}
 
     return JSONResponse(content=response_data)
+
+
+@router.post("/promo/{id}/like")
+async def like_promo(
+    id: UUID = Path(...),
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    promo_query = select(PromoCode).where(PromoCode.promo_id == id)
+    promo_result = await db.execute(promo_query)
+    promo = promo_result.scalar()
+
+    if promo is None:
+        raise HTTPException(status_code=404, detail="Промокод не найден")
+
+    like_query = select(user_liked_promos).where(
+        user_liked_promos.c.user_id == current_user.id,
+        user_liked_promos.c.promo_id == id
+    )
+    like_result = await db.execute(like_query)
+    like_exists = like_result.scalar()
+
+    if like_exists:
+        return JSONResponse(status_code=200, content={"detail": "Лайк уже поставлен"})
+
+    insert_stmt = user_liked_promos.insert().values(user_id=current_user.id, promo_id=id)
+    await db.execute(insert_stmt)
+
+    promo.like_count += 1
+    db.add(promo)
+    await db.commit()
+
+    return JSONResponse(status_code=200, content={"detail": "Лайк успешно добавлен"})
+
+
+@router.delete("/promo/{id}/like")
+async def unlike_promo(
+    id: UUID = Path(...),
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    promo_query = select(PromoCode).where(PromoCode.promo_id == id)
+    promo_result = await db.execute(promo_query)
+    promo = promo_result.scalar()
+
+    if promo is None:
+        raise HTTPException(status_code=404, detail="Промокод не найден")
+
+    like_query = select(user_liked_promos).where(
+        user_liked_promos.c.user_id == current_user.id,
+        user_liked_promos.c.promo_id == id
+    )
+    like_result = await db.execute(like_query)
+    like_exists = like_result.scalar()
+
+    if not like_exists:
+        return JSONResponse(status_code=200, content={"detail": "Лайк уже удалён"})
+
+    delete_stmt = user_liked_promos.delete().where(
+        user_liked_promos.c.user_id == current_user.id,
+        user_liked_promos.c.promo_id == id
+    )
+    await db.execute(delete_stmt)
+
+    promo.like_count = max(0, promo.like_count - 1)
+    db.add(promo)
+    await db.commit()
+
+    return JSONResponse(status_code=200, content={"detail": "Лайк успешно удалён"})
