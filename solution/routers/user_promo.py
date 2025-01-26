@@ -420,22 +420,25 @@ async def edit_comment(
 
     return formatted_comment
 
+
 @router.delete("/promo/{id}/comments/{comment_id}")
 async def delete_comment(
-    id: UUID = Path(...),
-    comment_id: UUID = Path(...),
-    db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_current_user)
+        id: UUID = Path(...),
+        comment_id: UUID = Path(...),
+        db: AsyncSession = Depends(get_db),
+        current_user=Depends(get_current_user)
 ):
     promo_query = select(PromoCode).where(PromoCode.promo_id == id)
     promo_result = await db.execute(promo_query)
     promo = promo_result.scalar()
+
     if promo is None:
         raise HTTPException(status_code=404, detail="Такого промокода не существует.")
 
     comment_query = select(Commentary).where(Commentary.id == comment_id, Commentary.promo_id == id)
     comment_result = await db.execute(comment_query)
     comment = comment_result.scalar()
+
     if comment is None:
         raise HTTPException(status_code=404, detail="Такого комментария не существует.")
 
@@ -443,7 +446,11 @@ async def delete_comment(
         raise HTTPException(status_code=403, detail="Комментарий не принадлежит пользователю.")
 
     await db.delete(comment)
+
+    promo.comment_count -= 1
+
     await db.commit()
 
     return {"status": "ok"}
+
 
