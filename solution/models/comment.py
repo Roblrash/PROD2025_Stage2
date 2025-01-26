@@ -1,6 +1,6 @@
-from sqlalchemy import Column, DateTime, ForeignKey, Text, UUID
+from sqlalchemy import Column, DateTime, ForeignKey, UUID, String
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from sqlalchemy.sql import func
 from backend.db import Base
 import uuid
 
@@ -8,9 +8,10 @@ class Commentary(Base):
     __tablename__ = "comments"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    promo_id = Column(UUID(as_uuid=True), ForeignKey("promo_codes.id"), nullable=False)
-    text = Column(Text, nullable=False)
-    date = Column(DateTime, nullable=False, default=datetime.utcnow)
-    author_id = Column(UUID(as_uuid=True), nullable=False)
+    text = Column(String(1000), nullable=False)
+    date = Column(DateTime(timezone=True), default=func.now())
+    author_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    promo_id = Column(UUID(as_uuid=True), ForeignKey("promo_codes.promo_id"), nullable=False)
 
-    promo_code = relationship("PromoCode", back_populates="comments")
+    author = relationship("User", backref="comments")
+    promo = relationship("PromoCode", back_populates="comments")

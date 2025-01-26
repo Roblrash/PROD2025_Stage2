@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query, HTTPException, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import func, or_, Integer, cast, and_, insert
+from sqlalchemy import func, or_, Integer, cast, and_
 from sqlalchemy.orm import class_mapper
 from typing import List, Optional
 from uuid import UUID
@@ -11,9 +11,10 @@ from models.promocode import PromoCode
 from models.user import User, user_activated_promos, user_liked_promos
 from models.comment import Commentary
 from schemas import  PromoForUser, Comment, CommentText, Author
-from datetime import datetime
+from datetime import datetime, timezone
 from starlette.responses import JSONResponse
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import selectinload
 
 router = APIRouter(prefix="/api/user")
 
@@ -62,11 +63,6 @@ async def get_promos(
 ):
     user_country = (current_user.other.get("country") or "").lower()
     user_age = current_user.other.get("age") or 0
-
-    print(f"User country: {user_country}")
-    print(f"User age: {user_age}")
-    print(f"Category filter: {category}")
-    print(f"Active filter: {active}")
 
     base_query = select(PromoCode)
 
@@ -240,39 +236,214 @@ async def unlike_promo(
 
     return JSONResponse(status_code=200, content={"status": "ok"})
 
-@router.post("/promo/{id}/comments", response_model=Comment, status_code=201)
+@router.post("/promo/{id}/comments", status_code=201)
 async def create_comment(
-    id: UUID = Path(..., description="UUID промокода."),
-    comment_data: CommentText = Depends(),
+    comment: CommentText,
+    id: UUID = Path(...),
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user=Depends(get_current_user)
 ):
-    promo_query = await db.execute(select(PromoCode).where(PromoCode.promo_id == id))
-    promo = promo_query.scalars().first()
+    query = select(PromoCode).where(PromoCode.promo_id == id)
+    result = await db.execute(query)
+    promo = result.scalar()
 
-    if not promo:
-        raise HTTPException(status_code=404, detail="Промокод не найден.")
+    if promo is None:
+        raise HTTPException(status_code=404, detail="Промокод не найден")
 
-    new_comment_id = UUID()
-    new_comment = {
-        "id": new_comment_id,
-        "promo_id": id,
-        "text": comment_data.text,
-        "date": datetime.now().astimezone(),
-        "author_id": current_user["id"],
-    }
+    new_comment = Commentary(
+        text=comment.text,
+        date=datetime.now(timezone.utc),
+        author_id=current_user.id,
+        promo_id=promo.promo_id,
+    )
 
-    stmt = insert(Commentary).values(new_comment)
-    await db.execute(stmt)
+    db.add(new_comment)
+
+    promo.comment_count += 1
+    db.add(promo)
+
     await db.commit()
 
-    return Comment(
-        id=new_comment_id,
-        text=comment_data.text,
-        date=new_comment["date"],
-        author=Author(
-            name=current_user["name"],
-            surname=current_user["surname"],
-            avatar_url=current_user.get("avatar_url"),
-        ),
+    author = {
+        "name": current_user.name,
+        "surname": current_user.surname,
+        "avatar_url": str(current_user.avatar_url) if current_user.avatar_url else None,
+    }
+
+    if author['avatar_url'] is None:
+        del author['avatar_url']
+
+    response_data = {
+        "id": str(new_comment.id),
+        "text": new_comment.text,
+        "date": new_comment.date.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "author": author
+    }
+
+    return response_data
+
+
+@router.get("/promo/{id}/comments")
+async def get_comments(
+    id: UUID = Path(...),
+    limit: int = Query(10, ge=1),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    query = select(PromoCode).where(PromoCode.promo_id == id)
+    result = await db.execute(query)
+    promo = result.scalar()
+    if promo is None:
+        raise HTTPException(status_code=404, detail="Промокод не найден")
+
+    query = (
+        select(Commentary)
+        .where(Commentary.promo_id == id)
+        .order_by(Commentary.date.desc())
+        .limit(limit)
+        .offset(offset)
+        .options(selectinload(Commentary.author))
     )
+    result = await db.execute(query)
+    comments = result.scalars().all()
+
+    count_query = select(func.count()).select_from(Commentary).where(Commentary.promo_id == id)
+    count_result = await db.execute(count_query)
+    total_count = count_result.scalar()
+
+    formatted_comments = []
+    for comment in comments:
+        author = {
+            "name": comment.author.name,
+            "surname": comment.author.surname,
+            "avatar_url": str(comment.author.avatar_url) if comment.author.avatar_url else None,
+        }
+        if author["avatar_url"] is None:
+            del author["avatar_url"]
+
+        formatted_comments.append({
+            "id": str(comment.id),
+            "text": comment.text,
+            "date": comment.date.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+
+            "author": author
+        })
+
+    return JSONResponse(
+        content=formatted_comments,
+        headers={"X-Total-Count": str(total_count)}
+    )
+
+@router.get("/promo/{id}/comments/{comment_id}")
+async def get_comment_by_id(
+    id: UUID = Path(...),
+    comment_id: UUID = Path(...),
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    promo_query = select(PromoCode).where(PromoCode.promo_id == id)
+    promo_result = await db.execute(promo_query)
+    promo = promo_result.scalar()
+    if promo is None:
+        raise HTTPException(status_code=404, detail="Такого промокода не существует.")
+
+    comment_query = (
+        select(Commentary)
+        .where(Commentary.id == comment_id, Commentary.promo_id == id)
+        .options(selectinload(Commentary.author))
+    )
+    comment_result = await db.execute(comment_query)
+    comment = comment_result.scalar()
+    if comment is None:
+        raise HTTPException(status_code=404, detail="Такого комментария не существует.")
+
+    author = {
+        "name": comment.author.name,
+        "surname": comment.author.surname,
+        "avatar_url": str(comment.author.avatar_url) if comment.author.avatar_url else None,
+    }
+    if author["avatar_url"] is None:
+        del author["avatar_url"]
+
+    formatted_comment = {
+        "id": str(comment.id),
+        "text": comment.text,
+        "date": comment.date.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "author": author
+    }
+
+    return formatted_comment
+
+
+@router.put("/promo/{id}/comments/{comment_id}")
+async def edit_comment(
+    comment_text: CommentText,
+    id: UUID = Path(...),
+    comment_id: UUID = Path(...),
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    promo_query = select(PromoCode).where(PromoCode.promo_id == id)
+    promo_result = await db.execute(promo_query)
+    promo = promo_result.scalar()
+    if promo is None:
+        raise HTTPException(status_code=404, detail="Такого промокода не существует.")
+
+    comment_query = select(Commentary).where(Commentary.id == comment_id, Commentary.promo_id == id)
+    comment_result = await db.execute(comment_query)
+    comment = comment_result.scalar()
+    if comment is None:
+        raise HTTPException(status_code=404, detail="Такого комментария не существует.")
+
+    if comment.author_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Комментарий не принадлежит пользователю.")
+
+    comment.text = comment_text.text
+    db.add(comment)
+    await db.commit()
+
+    author = {
+        "name": comment.author.name,
+        "surname": comment.author.surname,
+        "avatar_url": str(comment.author.avatar_url) if comment.author.avatar_url else None,
+    }
+    if author["avatar_url"] is None:
+        del author["avatar_url"]
+
+    formatted_comment = {
+        "id": str(comment.id),
+        "text": comment.text,
+        "date": comment.date.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "author": author
+    }
+
+    return formatted_comment
+
+@router.delete("/promo/{id}/comments/{comment_id}")
+async def delete_comment(
+    id: UUID = Path(...),
+    comment_id: UUID = Path(...),
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    promo_query = select(PromoCode).where(PromoCode.promo_id == id)
+    promo_result = await db.execute(promo_query)
+    promo = promo_result.scalar()
+    if promo is None:
+        raise HTTPException(status_code=404, detail="Такого промокода не существует.")
+
+    comment_query = select(Commentary).where(Commentary.id == comment_id, Commentary.promo_id == id)
+    comment_result = await db.execute(comment_query)
+    comment = comment_result.scalar()
+    if comment is None:
+        raise HTTPException(status_code=404, detail="Такого комментария не существует.")
+
+    if comment.author_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Комментарий не принадлежит пользователю.")
+
+    await db.delete(comment)
+    await db.commit()
+
+    return {"status": "ok"}
+

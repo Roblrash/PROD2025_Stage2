@@ -9,6 +9,7 @@ branch_labels = None
 depends_on = None
 
 def upgrade():
+    # Создание таблицы пользователей
     op.create_table(
         'users',
         sa.Column('id', UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True),
@@ -20,6 +21,7 @@ def upgrade():
         sa.Column('other', sa.JSON, nullable=True)
     )
 
+    # Создание таблицы компаний
     op.create_table(
         'companies',
         sa.Column('id', UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True),
@@ -28,6 +30,7 @@ def upgrade():
         sa.Column('password', sa.String(60), nullable=False),
     )
 
+    # Создание таблицы промокодов
     op.create_table(
         'promo_codes',
         sa.Column('id', UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
@@ -51,23 +54,37 @@ def upgrade():
         sa.Column('comment_count', sa.Integer, default=0)
     )
 
+    # Создание таблицы активации промокодов пользователями
     op.create_table(
         'user_activated_promos',
         sa.Column('user_id', UUID(as_uuid=True), sa.ForeignKey('users.id', ondelete='CASCADE'), primary_key=True),
         sa.Column('promo_id', UUID(as_uuid=True), sa.ForeignKey('promo_codes.promo_id', ondelete='CASCADE'), primary_key=True)
     )
 
+    # Создание таблицы понравившихся промокодов пользователями
     op.create_table(
         'user_liked_promos',
         sa.Column('user_id', UUID(as_uuid=True), sa.ForeignKey('users.id', ondelete='CASCADE'), primary_key=True),
         sa.Column('promo_id', UUID(as_uuid=True), sa.ForeignKey('promo_codes.promo_id', ondelete='CASCADE'), primary_key=True)
     )
 
+    # Создание таблицы комментариев
+    op.create_table(
+        'comments',
+        sa.Column('id', UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
+        sa.Column('text', sa.String(1000), nullable=False),
+        sa.Column('date', sa.DateTime, default=sa.func.now(), nullable=False),
+        sa.Column('author_id', UUID(as_uuid=True), sa.ForeignKey('users.id', ondelete='CASCADE'), nullable=False),
+        sa.Column('promo_id', UUID(as_uuid=True), sa.ForeignKey('promo_codes.promo_id', ondelete='CASCADE'), nullable=False),
+        sa.ForeignKeyConstraint(['author_id'], ['users.id'], ondelete='CASCADE'),
+        sa.ForeignKeyConstraint(['promo_id'], ['promo_codes.promo_id'], ondelete='CASCADE')
+    )
 
 def downgrade():
+    # Удаление таблиц в случае отката миграции
+    op.drop_table('comments')
     op.drop_table('user_activated_promos')
     op.drop_table('user_liked_promos')
     op.drop_table('users')
     op.drop_table('promo_codes')
     op.drop_table('companies')
-

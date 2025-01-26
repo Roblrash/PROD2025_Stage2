@@ -35,4 +35,4 @@ class PromoCode(Base):
     active = Column(Boolean, default=True)
 
     company = relationship("Company", back_populates="promos")
-    comments = relationship("Commentary", back_populates="promo_code")
+    comments = relationship("Commentary", back_populates="promo")
