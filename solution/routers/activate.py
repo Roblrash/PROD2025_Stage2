@@ -46,7 +46,7 @@ async def call_antifraud_service(user_email: str, promo_id: UUID, redis: Redis) 
     if cached_result:
         return json.loads(cached_result)
 
-    antifraud_url = f"{settings.ANTIFRAUD_ADDRESS}/api/validate"
+    antifraud_url = f"http://{settings.ANTIFRAUD_ADDRESS}/api/validate"
     payload = {"user_email": user_email, "promo_id": str(promo_id)}
 
     async with aiohttp.ClientSession() as session:
