@@ -14,6 +14,25 @@ from routers.auth_user import get_current_user
 
 router = APIRouter(prefix="/api/user")
 
+@router.get("/promo/history", response_model=List[PromoForUser])
+async def get_promo_history(
+        limit: int = Query(10, ge=1),
+        offset: int = Query(0, ge=0),
+        db: AsyncSession = Depends(get_db),
+        current_user=Depends(get_current_user)
+):
+    user_query = select(User).where(User.id == current_user.id)
+    user_result = await db.execute(user_query)
+    user = user_result.scalar()
+
+    promo_query = select(PromoCode).join(user_activated_promos).where(
+        user_activated_promos.c.user_id == user.id
+    ).order_by(user_activated_promos.c.activation_date.desc()).limit(limit).offset(offset)
+
+    promo_result = await db.execute(promo_query)
+    promo_history = promo_result.scalars().all()
+
+    return promo_history
 
 @router.post("/promo/{id}/activate")
 async def activate_promo(
@@ -96,23 +115,3 @@ async def call_antifraud_service(user_email: str, promo_id: UUID) -> dict:
                     return await response.json()
     raise HTTPException(status_code=403, detail="Ошибка антифрод-сервиса.")
 
-
-@router.get("/promo/history", response_model=List[PromoForUser])
-async def get_promo_history(
-        limit: int = Query(10, ge=1),
-        offset: int = Query(0, ge=0),
-        db: AsyncSession = Depends(get_db),
-        current_user=Depends(get_current_user)
-):
-    user_query = select(User).where(User.id == current_user.id)
-    user_result = await db.execute(user_query)
-    user = user_result.scalar()
-
-    promo_query = select(PromoCode).join(user_activated_promos).where(
-        user_activated_promos.c.user_id == user.id
-    ).order_by(user_activated_promos.c.activation_date.desc()).limit(limit).offset(offset)
-
-    promo_result = await db.execute(promo_query)
-    promo_history = promo_result.scalars().all()
-
-    return promo_history

@@ -2,7 +2,7 @@ from sqlalchemy import Column, String, JSON, ForeignKey, Table, DateTime
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 import uuid
-from datetime import datetime
+from sqlalchemy.sql import func
 from backend.db import Base
 
 class User(Base):
@@ -28,7 +28,7 @@ user_activated_promos = Table(
     Base.metadata,
     Column('user_id', UUID(as_uuid=True), ForeignKey('users.id', ondelete="CASCADE"), primary_key=True),
     Column('promo_id', UUID(as_uuid=True), ForeignKey('promo_codes.promo_id', ondelete="CASCADE"), primary_key=True),
-    Column('activation_date', DateTime, default=datetime.utcnow)
+    Column('activation_date', DateTime, default=func.now())
 )
 
 user_liked_promos = Table(

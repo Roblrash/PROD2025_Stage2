@@ -19,26 +19,26 @@ app = FastAPI()
 #
 #app.openapi_schema = load_openapi_schema()
 
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    return JSONResponse(
-        status_code=400,
-        content={"detail": "Invalid request data"}
-    )
-
-@app.exception_handler(ValueError)
-async def value_error_handler(request: Request, exc: ValueError):
-    return JSONResponse(
-        status_code=400,
-        content={"detail": str(exc)},
-    )
+# @app.exception_handler(RequestValidationError)
+# async def validation_exception_handler(request: Request, exc: RequestValidationError):
+#     return JSONResponse(
+#         status_code=400,
+#         content={"detail": "Invalid request data"}
+#     )
+#
+# @app.exception_handler(ValueError)
+# async def value_error_handler(request: Request, exc: ValueError):
+#     return JSONResponse(
+#         status_code=400,
+#         content={"detail": str(exc)},
+#     )
 
 app.include_router(auth.router)
 app.include_router(promo.router)
 app.include_router(auth_user.router)
 app.include_router(user_profile.router)
-app.include_router(user_promo.router)
 app.include_router(activate.router)
+app.include_router(user_promo.router)
 
 @app.get("/api/ping")
 def send():
