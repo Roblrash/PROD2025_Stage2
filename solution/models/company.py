@@ -11,6 +11,6 @@ class Company(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     name = Column(String(50), nullable=False)
     email = Column(String(120), unique=True, index=True, nullable=False)
-    password = Column(String(60), nullable=False)
+    password = Column(String(255), nullable=False)
 
     promos = relationship("PromoCode", back_populates="company")

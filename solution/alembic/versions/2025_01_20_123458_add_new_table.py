@@ -27,7 +27,7 @@ def upgrade():
         sa.Column('id', UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True),
         sa.Column('name', sa.String(50), nullable=False),
         sa.Column('email', sa.String(120), unique=True, index=True, nullable=False),
-        sa.Column('password', sa.String(60), nullable=False),
+        sa.Column('password', sa.String(255), nullable=False),
     )
 
     # Создание таблицы промокодов

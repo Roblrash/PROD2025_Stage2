@@ -5,7 +5,7 @@ asyncpg
 python-dotenv
 pydantic
 python-jose[cryptography]
-passlib[bcrypt]
+passlib[argon2]
 pydantic-settings
 pydantic[email]
 alembic

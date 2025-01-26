@@ -17,7 +17,7 @@ def get_redis(request: Request) -> Redis:
     return request.app.state.redis
 
 router = APIRouter(prefix="/api/user/auth")
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 logging.basicConfig(level=logging.DEBUG)
 
 TOKEN_TTL = 7200

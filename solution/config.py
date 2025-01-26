@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     POSTGRES_DATABASE: str
     REDIS_HOST: str
     REDIS_PORT: int
-    #ANTIFRAUD_ADDRESS: str
+    ANTIFRAUD_ADDRESS: str
     RANDOM_SECRET: str
 
     @property
