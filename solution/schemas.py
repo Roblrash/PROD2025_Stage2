@@ -1,3 +1,4 @@
+from dns.resolver import NoAnswer
 from pydantic import BaseModel, EmailStr, conint, constr, field_validator, Field, conlist, model_validator, HttpUrl
 from typing import List, Optional
 from uuid import UUID
@@ -134,10 +135,22 @@ class PromoReadOnly(BaseModel):
             date: lambda v: v.strftime('%Y-%m-%d')
         }
 
+class Countries(BaseModel):
+    country: Optional[constr(pattern=r'^[A-Za-z]{2}$')] = None
+    activations_count: conint(ge=1)
+
+    @field_validator('country')
+    def validate_country(cls, value):
+        if value is None:
+            return value
+
+        if not pycountry.countries.get(alpha_2=value.upper()):
+            raise ValueError("Страна не существует в ISO 3166-1 alpha-2.")
+        return value
+
 class PromoStat(BaseModel):
     activations_count: conint(ge=0)
-    countries: List[dict]
-
+    countries: Optional[Countries] = None
 
 class UserTargetSettings(BaseModel):
     age: conint(ge=0, le=100)
