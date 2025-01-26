@@ -1,7 +1,7 @@
 from pydantic import BaseModel, EmailStr, conint, constr, field_validator, Field, conlist, model_validator, HttpUrl
 from typing import List, Optional
 from uuid import UUID
-from datetime import date
+from datetime import date, datetime
 import pycountry
 import re
 
@@ -218,6 +218,28 @@ class SignIn(BaseModel):
         if not re.match(password_pattern, v):
             raise ValueError("Неправильный формат пароля")
         return v
+
+class CommentText(BaseModel):
+    text: constr(min_length=10, max_length=1000)
+
+class Author(BaseModel):
+    name: constr(min_length=1, max_length=100)
+    surname: constr(min_length=1, max_length=120)
+    avatar_url: Optional[str] = None
+
+    @model_validator(mode="after")
+    def check_image_url_length(cls, values):
+        avatar_url = values.avatar_url
+        if avatar_url and len(str(avatar_url)) > 350:
+            raise ValueError("URL must be at most 350 characters long.")
+        return values
+
+class Comment(BaseModel):
+    id: UUID
+    text: CommentText
+    date: datetime
+    author: Author
+
 
 class PromoId(BaseModel):
     promo_id: UUID

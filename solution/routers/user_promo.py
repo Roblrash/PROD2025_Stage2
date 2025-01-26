@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query, HTTPException, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import func, or_, Integer, cast, and_
+from sqlalchemy import func, or_, Integer, cast, and_, insert
 from sqlalchemy.orm import class_mapper
 from typing import List, Optional
 from uuid import UUID
@@ -9,7 +9,8 @@ from backend.db import get_db
 from routers.auth_user import get_current_user
 from models.promocode import PromoCode
 from models.user import User, user_activated_promos, user_liked_promos
-from schemas import  PromoForUser
+from models.comment import Commentary
+from schemas import  PromoForUser, Comment, CommentText, Author
 from datetime import datetime
 from starlette.responses import JSONResponse
 from sqlalchemy.dialects.postgresql import JSONB
@@ -192,7 +193,7 @@ async def like_promo(
     like_exists = like_result.scalar()
 
     if like_exists:
-        return JSONResponse(status_code=200, content={"detail": "Лайк уже поставлен"})
+        return JSONResponse(status_code=200, content={"status": "ok"})
 
     insert_stmt = user_liked_promos.insert().values(user_id=current_user.id, promo_id=id)
     await db.execute(insert_stmt)
@@ -201,7 +202,7 @@ async def like_promo(
     db.add(promo)
     await db.commit()
 
-    return JSONResponse(status_code=200, content={"detail": "Лайк успешно добавлен"})
+    return JSONResponse(status_code=200, content={"status": "ok"})
 
 
 @router.delete("/promo/{id}/like")
@@ -225,7 +226,7 @@ async def unlike_promo(
     like_exists = like_result.scalar()
 
     if not like_exists:
-        return JSONResponse(status_code=200, content={"detail": "Лайк уже удалён"})
+        return JSONResponse(status_code=200, content={"status": "ok"})
 
     delete_stmt = user_liked_promos.delete().where(
         user_liked_promos.c.user_id == current_user.id,
@@ -237,4 +238,41 @@ async def unlike_promo(
     db.add(promo)
     await db.commit()
 
-    return JSONResponse(status_code=200, content={"detail": "Лайк успешно удалён"})
+    return JSONResponse(status_code=200, content={"status": "ok"})
+
+@router.post("/promo/{id}/comments", response_model=Comment, status_code=201)
+async def create_comment(
+    id: UUID = Path(..., description="UUID промокода."),
+    comment_data: CommentText = Depends(),
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    promo_query = await db.execute(select(PromoCode).where(PromoCode.promo_id == id))
+    promo = promo_query.scalars().first()
+
+    if not promo:
+        raise HTTPException(status_code=404, detail="Промокод не найден.")
+
+    new_comment_id = UUID()
+    new_comment = {
+        "id": new_comment_id,
+        "promo_id": id,
+        "text": comment_data.text,
+        "date": datetime.now().astimezone(),
+        "author_id": current_user["id"],
+    }
+
+    stmt = insert(Commentary).values(new_comment)
+    await db.execute(stmt)
+    await db.commit()
+
+    return Comment(
+        id=new_comment_id,
+        text=comment_data.text,
+        date=new_comment["date"],
+        author=Author(
+            name=current_user["name"],
+            surname=current_user["surname"],
+            avatar_url=current_user.get("avatar_url"),
+        ),
+    )
