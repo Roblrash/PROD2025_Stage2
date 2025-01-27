@@ -30,38 +30,43 @@ async def get_promo_history(
     user_result = await db.execute(user_query)
     user = user_result.scalar()
 
-    promo_query = select(PromoCode).join(user_activated_promos).where(
-        user_activated_promos.c.user_id == user.id
-    ).order_by(user_activated_promos.c.activation_date.desc()).limit(limit).offset(offset)
+    promo_query = (
+        select(PromoCode)
+        .join(user_activated_promos)
+        .where(user_activated_promos.c.user_id == user.id)
+        .order_by(user_activated_promos.c.activation_date.desc())
+        .limit(limit)
+        .offset(offset)
+    )
 
     promo_result = await db.execute(promo_query)
     promo_history = promo_result.scalars().all()
 
-    result = []
+    formatted_promo_history = []
     for promo in promo_history:
         is_activated_by_user = any(activated_promo.promo_id == promo.promo_id for activated_promo in user.activated_promos)
-
         is_liked_by_user = any(liked_promo.promo_id == promo.promo_id for liked_promo in user.liked_promos)
 
-        image_url = promo.image_url if promo.image_url else None
+        formatted_promo = {
+            "promo_id": str(promo.promo_id),
+            "company_id": str(promo.company_id),
+            "company_name": promo.company_name,
+            "description": promo.description,
+            "active": promo.active,
+            "is_activated_by_user": is_activated_by_user,
+            "like_count": promo.like_count,
+            "is_liked_by_user": is_liked_by_user,
+        }
 
-        promo_for_user = PromoForUser(
-            promo_id=promo.promo_id,
-            company_id=promo.company_id,
-            company_name=promo.company_name,
-            description=promo.description,
-            image_url=image_url,
-            active=promo.active,
-            is_activated_by_user=is_activated_by_user,
-            like_count=promo.like_count,
-            is_liked_by_user=is_liked_by_user,
-            comment_count=promo.comment_count
-        )
-        promo_dict = promo_for_user.dict(exclude_none=True)
+        if promo.image_url:
+            formatted_promo["image_url"] = promo.image_url
+        else:
+            formatted_promo.pop("image_url", None)
 
-        result.append(promo_dict)
+        formatted_promo_history.append(formatted_promo)
 
-    return result
+    return formatted_promo_history
+
 
 async def call_antifraud_service(user_email: str, promo_id: UUID, redis: Redis) -> dict:
     cache_key = f"antifraud:{user_email}:{promo_id}"
