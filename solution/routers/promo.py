@@ -50,6 +50,8 @@ async def create_promo(
             detail="'active_from' cannot be later than 'active_until'."
         )
 
+    unique_count = len(promo_codes) if promo_codes else 0
+
     promo_instance = PromoCode(
         company_id=company.id,
         company_name=company.name,
@@ -67,8 +69,9 @@ async def create_promo(
         like_count=0,
         used_count=0,
         created_at=func.now(),
-        promo_id =uuid.uuid4(),
-        comment_count=0
+        promo_id=uuid.uuid4(),
+        comment_count=0,
+        unique_count=unique_count
     )
 
     if not calculate_active(promo_instance):
