@@ -19,14 +19,24 @@ router = APIRouter(prefix="/api/user")
 def get_redis(request: Request) -> Redis:
     return request.app.state.redis
 
+from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
+
 @router.get("/promo/history", response_model=List[PromoForUser])
 async def get_promo_history(
-        limit: int = Query(10, ge=1),
-        offset: int = Query(0, ge=0),
-        db: AsyncSession = Depends(get_db),
-        current_user=Depends(get_current_user)
+    limit: int = Query(10, ge=1),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user)
 ):
-    user_query = select(User).where(User.id == current_user.id)
+    user_query = (
+        select(User)
+        .where(User.id == current_user.id)
+        .options(
+            selectinload(User.activated_promos),
+            selectinload(User.liked_promos),
+        )
+    )
     user_result = await db.execute(user_query)
     user = user_result.scalar()
 
@@ -44,8 +54,14 @@ async def get_promo_history(
 
     formatted_promo_history = []
     for promo in promo_history:
-        is_activated_by_user = any(activated_promo.promo_id == promo.promo_id for activated_promo in user.activated_promos)
-        is_liked_by_user = any(liked_promo.promo_id == promo.promo_id for liked_promo in user.liked_promos)
+        is_activated_by_user = any(
+            activated_promo.promo_id == promo.promo_id
+            for activated_promo in user.activated_promos
+        )
+        is_liked_by_user = any(
+            liked_promo.promo_id == promo.promo_id
+            for liked_promo in user.liked_promos
+        )
 
         formatted_promo = {
             "promo_id": str(promo.promo_id),
