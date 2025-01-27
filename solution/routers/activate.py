@@ -37,7 +37,31 @@ async def get_promo_history(
     promo_result = await db.execute(promo_query)
     promo_history = promo_result.scalars().all()
 
-    return promo_history
+    result = []
+    for promo in promo_history:
+        is_activated_by_user = any(activated_promo.promo_id == promo.promo_id for activated_promo in user.activated_promos)
+
+        is_liked_by_user = any(liked_promo.promo_id == promo.promo_id for liked_promo in user.liked_promos)
+
+        image_url = promo.image_url if promo.image_url else None
+
+        promo_for_user = PromoForUser(
+            promo_id=promo.promo_id,
+            company_id=promo.company_id,
+            company_name=promo.company_name,
+            description=promo.description,
+            image_url=image_url,
+            active=promo.active,
+            is_activated_by_user=is_activated_by_user,
+            like_count=promo.like_count,
+            is_liked_by_user=is_liked_by_user,
+            comment_count=promo.comment_count
+        )
+        promo_dict = promo_for_user.dict(exclude_none=True)
+
+        result.append(promo_dict)
+
+    return result
 
 async def call_antifraud_service(user_email: str, promo_id: UUID, redis: Redis) -> dict:
     cache_key = f"antifraud:{user_email}:{promo_id}"
