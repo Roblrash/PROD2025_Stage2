@@ -23,13 +23,25 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from fastapi.responses import JSONResponse
 
+
 def is_currently_active(promo: PromoCode) -> bool:
     current_date = datetime.utcnow().date()
+
     if not promo.active:
         return False
     active_from = promo.active_from or date.min
     active_until = promo.active_until or date.max
-    return active_from <= current_date <= active_until
+    if not (active_from <= current_date <= active_until):
+        return False
+
+    if promo.mode == "COMMON" and promo.used_count >= promo.limit:
+        return False
+
+    if promo.mode == "UNIQUE" and promo.used_count >= promo.unique_count:
+        return False
+
+    return True
+
 
 @router.get("/promo/history", response_model=List[PromoForUser])
 async def get_promo_history(
@@ -52,26 +64,30 @@ async def get_promo_history(
     if user is None:
         raise HTTPException(status_code=404, detail="Пользователь не найден.")
 
-    promo_query = (
-        select(PromoCode)
-        .join(user_activated_promos)
+    activation_query = (
+        select(user_activated_promos.c.promo_id, user_activated_promos.c.activation_count)
         .where(user_activated_promos.c.user_id == user.id)
         .order_by(user_activated_promos.c.activation_date.desc())
         .limit(limit)
         .offset(offset)
     )
-    promo_result = await db.execute(promo_query)
-    promo_history = promo_result.scalars().all()
+    activation_result = await db.execute(activation_query)
+    activated_promo_data = activation_result.fetchall()
 
     formatted_promo_history = []
-    for promo in promo_history:
-        is_activated_by_user = any(
-            activated_promo.promo_id == promo.promo_id
-            for activated_promo in user.activated_promos
-        )
+    for promo_id, count in activated_promo_data:
+        promo_query = select(PromoCode).where(PromoCode.promo_id == promo_id)
+        promo_result = await db.execute(promo_query)
+        promo = promo_result.scalar()
+
+        if promo is None:
+            continue
+
+        is_active = is_currently_active(promo)
+
+        is_activated_by_user = True
         is_liked_by_user = any(
-            liked_promo.promo_id == promo.promo_id
-            for liked_promo in user.liked_promos
+            liked_promo.promo_id == promo.promo_id for liked_promo in user.liked_promos
         )
 
         formatted_promo = {
@@ -79,7 +95,7 @@ async def get_promo_history(
             "company_id": str(promo.company_id),
             "company_name": promo.company_name,
             "description": promo.description,
-            "active": is_currently_active(promo),
+            "active": is_active,
             "is_activated_by_user": is_activated_by_user,
             "like_count": promo.like_count,
             "is_liked_by_user": is_liked_by_user,
@@ -89,7 +105,7 @@ async def get_promo_history(
         if promo.image_url:
             formatted_promo["image_url"] = promo.image_url
 
-        formatted_promo_history.append(formatted_promo)
+        formatted_promo_history.extend([formatted_promo] * count)
 
     return JSONResponse(content=formatted_promo_history, headers={"X-Total-Count": str(len(formatted_promo_history))})
 
@@ -119,11 +135,12 @@ async def call_antifraud_service(user_email: str, promo_id: UUID, redis: Redis) 
 
 @router.post("/promo/{id}/activate")
 async def activate_promo(
-        id: UUID = Path(...),
-        db: AsyncSession = Depends(get_db),
-        current_user=Depends(get_current_user),
-        redis: Redis = Depends(get_redis)
+    id: UUID = Path(...),
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+    redis: Redis = Depends(get_redis)
 ):
+    # Проверка пользователя
     user_query = select(User).where(User.id == current_user.id)
     user_result = await db.execute(user_query)
     user = user_result.scalar()
@@ -139,51 +156,40 @@ async def activate_promo(
     activation_query = select(user_activated_promos).where(
         user_activated_promos.c.user_id == user.id,
         user_activated_promos.c.promo_id == id,
-    ).order_by(user_activated_promos.c.activation_date.desc())
-
+    )
     activation_result = await db.execute(activation_query)
     activation_exists = activation_result.scalar()
 
-    current_date = datetime.now().date()
-    active_from = promo.active_from or date.min
-    active_until = promo.active_until or date.max
+    if promo.mode == "UNIQUE":
+        if promo.used_count >= promo.unique_count:
+            raise HTTPException(status_code=403, detail="Все уникальные коды уже активированы.")
 
-    if active_from > current_date or active_until < current_date:
-        raise HTTPException(status_code=403, detail="Промокод не активен в текущий период.")
+        unique_index = promo.used_count
+        unique_code = promo.promo_unique[unique_index]
 
-    if promo.target.get("country"):
-        target_country = promo.target["country"].lower()
-        user_country = user.other.get("country", "").lower()
-        if target_country and target_country != user_country:
-            raise HTTPException(status_code=403, detail="Промокод недоступен для вашей страны.")
+        promo.used_count += 1
+        await db.merge(promo)
 
-    age_from = promo.target.get("age_from") or 0
-    age_until = promo.target.get("age_until") or 1000
-    user_age = user.other.get("age")
-    if user_age is None or not (age_from <= user_age <= age_until):
-        raise HTTPException(status_code=403, detail="Промокод недоступен для вашего возраста.")
-
-    if promo.mode == "COMMON" and promo.used_count >= promo.max_count:
-        raise HTTPException(status_code=403, detail="Лимит использования промокода исчерпан.")
-
-    if promo.mode == "UNIQUE" and promo.unique_count <= 0:
-        raise HTTPException(status_code=403, detail="Нет доступных уникальных промокодов.")
-
-    antifraud_result = await call_antifraud_service(current_user.email, promo.promo_id, redis)
-    if not antifraud_result.get("ok", False):
-        raise HTTPException(status_code=403, detail="Активировать промокод запрещено антифрод-сервисом.")
+    elif promo.mode == "COMMON":
+        if promo.used_count >= promo.limit:
+            raise HTTPException(status_code=403, detail="Лимит активаций достигнут.")
+        unique_code = promo.promo_common
+        promo.used_count += 1
+        await db.merge(promo)
 
     if not activation_exists:
-        insert_stmt = user_activated_promos.insert().values(user_id=user.id, promo_id=id)
+        insert_stmt = user_activated_promos.insert().values(user_id=user.id, promo_id=id, activation_count=1)
         await db.execute(insert_stmt)
-
-    promo.used_count += 1
-    if promo.mode == "UNIQUE":
-        promo_value = promo.promo_unique[0]
-        promo.unique_count -= 1
     else:
-        promo_value = promo.promo_common
+        update_stmt = (
+            user_activated_promos.update()
+            .where(user_activated_promos.c.user_id == user.id)
+            .where(user_activated_promos.c.promo_id == id)
+            .values(activation_count=user_activated_promos.c.activation_count + 1)
+        )
+        await db.execute(update_stmt)
 
     await db.commit()
 
-    return {"promo": promo_value}
+    return {"promo": unique_code}
+

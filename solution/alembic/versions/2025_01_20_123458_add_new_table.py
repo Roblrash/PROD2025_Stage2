@@ -56,7 +56,8 @@ def upgrade():
         'user_activated_promos',
         sa.Column('user_id', UUID(as_uuid=True), sa.ForeignKey('users.id', ondelete='CASCADE'), primary_key=True),
         sa.Column('promo_id', UUID(as_uuid=True), sa.ForeignKey('promo_codes.promo_id', ondelete='CASCADE'), primary_key=True),
-        sa.Column('activation_date', sa.TIMESTAMP, nullable=False, server_default=sa.func.now())
+        sa.Column('activation_date', sa.TIMESTAMP, nullable=False, server_default=sa.func.now()),
+        sa.Column('activation_count', sa.Integer, default=0)
     )
 
     op.create_table(
