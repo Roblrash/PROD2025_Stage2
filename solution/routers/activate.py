@@ -21,8 +21,15 @@ def get_redis(request: Request) -> Redis:
 
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
-
 from fastapi.responses import JSONResponse
+
+def is_currently_active(promo: PromoCode) -> bool:
+    current_date = datetime.utcnow().date()
+    if not promo.active:
+        return False
+    active_from = promo.active_from or date.min
+    active_until = promo.active_until or date.max
+    return active_from <= current_date <= active_until
 
 @router.get("/promo/history", response_model=List[PromoForUser])
 async def get_promo_history(
@@ -72,7 +79,7 @@ async def get_promo_history(
             "company_id": str(promo.company_id),
             "company_name": promo.company_name,
             "description": promo.description,
-            "active": promo.active,
+            "active": is_currently_active(promo),
             "is_activated_by_user": is_activated_by_user,
             "like_count": promo.like_count,
             "is_liked_by_user": is_liked_by_user,
@@ -85,8 +92,6 @@ async def get_promo_history(
         formatted_promo_history.append(formatted_promo)
 
     return JSONResponse(content=formatted_promo_history, headers={"X-Total-Count": str(len(formatted_promo_history))})
-
-
 
 
 async def call_antifraud_service(user_email: str, promo_id: UUID, redis: Redis) -> dict:
@@ -144,9 +149,6 @@ async def activate_promo(
 
     if active_from > current_date or active_until < current_date:
         raise HTTPException(status_code=403, detail="Промокод не активен в текущий период.")
-    else:
-        if not promo.active:
-            promo.active = True
 
     if promo.target.get("country"):
         target_country = promo.target["country"].lower()

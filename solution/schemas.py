@@ -150,7 +150,7 @@ class CountryStat(BaseModel):
 
 class PromoStat(BaseModel):
     activations_count: conint(ge=0)
-    countries: List[CountryStat] = []
+    countries: Optional[list[CountryStat]] = None
 
 class UserTargetSettings(BaseModel):
     age: conint(ge=0, le=100)

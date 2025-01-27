@@ -330,7 +330,7 @@ async def get_promo_stat(
 
     country_stats_res = await db.execute(
         select(
-            User.other["country"].astext.label("country"),
+            func.jsonb_extract_path_text(User.other, 'country').label("country"),
             func.count().label("cnt")
         )
         .select_from(User)
@@ -339,7 +339,7 @@ async def get_promo_stat(
             user_activated_promos.c.user_id == User.id
         )
         .where(user_activated_promos.c.promo_id == promo_code.promo_id)
-        .group_by(User.other["country"])
+        .group_by(func.jsonb_extract_path_text(User.other, 'country'))
     )
 
     rows = country_stats_res.all()
@@ -347,11 +347,10 @@ async def get_promo_stat(
     filtered_rows = [(c, cnt) for (c, cnt) in rows if c is not None]
     sorted_rows = sorted(filtered_rows, key=lambda x: x[0].lower())
 
-    countries_data: List[CountryStat] = []
-    for country_code, count_activations in sorted_rows:
-        countries_data.append(
-            CountryStat(country=country_code, activations_count=count_activations)
-        )
+    countries_data: List[CountryStat] = [
+        CountryStat(country=country_code, activations_count=count_activations)
+        for country_code, count_activations in sorted_rows
+    ]
 
     response_data = {
         "activations_count": total_activations,
@@ -361,5 +360,6 @@ async def get_promo_stat(
         response_data["countries"] = countries_data
 
     return response_data
+
 
 
