@@ -4,7 +4,7 @@ from typing import Dict, Any, List, Optional
 from backend.db import get_db
 from routers.auth import get_current_company
 from models.promocode import PromoCode
-from schemas import PromoCreate, PromoReadOnly, PromoPatch, PromoStat, Countries
+from schemas import PromoCreate, PromoReadOnly, PromoPatch, PromoStat, CountryStat
 from datetime import datetime
 from fastapi.responses import JSONResponse
 from sqlalchemy.future import select
@@ -303,7 +303,6 @@ async def patch_promo(
     return JSONResponse(content=response_data)
 
 from models.user import User, user_activated_promos
-from schemas import CountryStat
 
 @router.get("/{id}/stat", response_model=PromoStat)
 async def get_promo_stat(
@@ -354,8 +353,13 @@ async def get_promo_stat(
             CountryStat(country=country_code, activations_count=count_activations)
         )
 
-    return PromoStat(
-        activations_count=total_activations,
-        countries=countries_data
-    )
+    response_data = {
+        "activations_count": total_activations,
+    }
+
+    if countries_data:
+        response_data["countries"] = countries_data
+
+    return response_data
+
 
