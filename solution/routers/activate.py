@@ -135,12 +135,11 @@ async def call_antifraud_service(user_email: str, promo_id: UUID, redis: Redis) 
 
 @router.post("/promo/{id}/activate")
 async def activate_promo(
-    id: UUID = Path(...),
-    db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_current_user),
-    redis: Redis = Depends(get_redis)
+        id: UUID = Path(...),
+        db: AsyncSession = Depends(get_db),
+        current_user=Depends(get_current_user),
+        redis: Redis = Depends(get_redis)
 ):
-    # Проверка пользователя
     user_query = select(User).where(User.id == current_user.id)
     user_result = await db.execute(user_query)
     user = user_result.scalar()
@@ -160,36 +159,48 @@ async def activate_promo(
     activation_result = await db.execute(activation_query)
     activation_exists = activation_result.scalar()
 
-    if promo.mode == "UNIQUE":
-        if promo.used_count >= promo.unique_count:
-            raise HTTPException(status_code=403, detail="Все уникальные коды уже активированы.")
+    current_date = datetime.utcnow().date()
+    active_from = promo.active_from or date.min
+    active_until = promo.active_until or date.max
+    if not (active_from <= current_date <= active_until) or not promo.active:
+        raise HTTPException(status_code=403, detail="Промокод не активен в текущий период.")
 
-        unique_index = promo.used_count
-        unique_code = promo.promo_unique[unique_index]
+    if promo.target.get("country"):
+        target_country = promo.target["country"].lower()
+        user_country = user.other.get("country", "").lower()
+        if target_country and target_country != user_country:
+            raise HTTPException(status_code=403, detail="Промокод недоступен для вашей страны.")
 
-        promo.used_count += 1
-        await db.merge(promo)
+    age_from = promo.target.get("age_from") or 0
+    age_until = promo.target.get("age_until") or 1000
+    user_age = user.other.get("age")
+    if user_age is None or not (age_from <= user_age <= age_until):
+        raise HTTPException(status_code=403, detail="Промокод недоступен для вашего возраста.")
 
-    elif promo.mode == "COMMON":
-        if promo.used_count >= promo.limit:
-            raise HTTPException(status_code=403, detail="Лимит активаций достигнут.")
-        unique_code = promo.promo_common
-        promo.used_count += 1
-        await db.merge(promo)
+    if promo.mode == "COMMON" and promo.used_count >= promo.max_count:
+        raise HTTPException(status_code=403, detail="Лимит использования промокода исчерпан.")
+
+    if promo.mode == "UNIQUE" and promo.used_count >= promo.unique_count:
+        raise HTTPException(status_code=403, detail="Нет доступных уникальных промокодов.")
+
+    antifraud_result = await call_antifraud_service(current_user.email, promo.promo_id, redis)
+    if not antifraud_result.get("ok", False):
+        raise HTTPException(status_code=403, detail="Активировать промокод запрещено антифрод-сервисом.")
 
     if not activation_exists:
-        insert_stmt = user_activated_promos.insert().values(user_id=user.id, promo_id=id, activation_count=1)
+        insert_stmt = user_activated_promos.insert().values(user_id=user.id, promo_id=id)
         await db.execute(insert_stmt)
+
+    promo.used_count += 1
+
+    if promo.mode == "UNIQUE":
+        unique_index = promo.used_count - 1
+        if unique_index >= len(promo.promo_unique):
+            raise HTTPException(status_code=403, detail="Нет доступных уникальных промокодов.")
+        promo_value = promo.promo_unique[unique_index]
     else:
-        update_stmt = (
-            user_activated_promos.update()
-            .where(user_activated_promos.c.user_id == user.id)
-            .where(user_activated_promos.c.promo_id == id)
-            .values(activation_count=user_activated_promos.c.activation_count + 1)
-        )
-        await db.execute(update_stmt)
+        promo_value = promo.promo_common
 
     await db.commit()
 
-    return {"promo": unique_code}
-
+    return {"promo": promo_value}
