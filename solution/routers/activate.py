@@ -139,7 +139,8 @@ async def activate_promo(
     activation_query = select(user_activated_promos).where(
         user_activated_promos.c.user_id == user.id,
         user_activated_promos.c.promo_id == id,
-    )
+    ).order_by(user_activated_promos.c.activation_date.desc())
+
     activation_result = await db.execute(activation_query)
     activation_exists = activation_result.scalar()
 
