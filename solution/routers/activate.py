@@ -27,7 +27,7 @@ async def get_promo_history(
     limit: int = Query(10, ge=1),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_current_user)
+    current_user=Depends(get_current_user),
 ):
     user_query = (
         select(User)
@@ -72,16 +72,16 @@ async def get_promo_history(
             "is_activated_by_user": is_activated_by_user,
             "like_count": promo.like_count,
             "is_liked_by_user": is_liked_by_user,
+            "comment_count": promo.comment_count,
         }
 
         if promo.image_url:
             formatted_promo["image_url"] = promo.image_url
-        else:
-            formatted_promo.pop("image_url", None)
 
         formatted_promo_history.append(formatted_promo)
 
     return formatted_promo_history
+
 
 
 async def call_antifraud_service(user_email: str, promo_id: UUID, redis: Redis) -> dict:

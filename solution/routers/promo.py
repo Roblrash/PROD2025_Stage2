@@ -4,7 +4,7 @@ from typing import Dict, Any, List, Optional
 from backend.db import get_db
 from routers.auth import get_current_company
 from models.promocode import PromoCode
-from schemas import PromoCreate, PromoReadOnly, PromoPatch
+from schemas import PromoCreate, PromoReadOnly, PromoPatch, PromoStat, Countries
 from datetime import datetime
 from fastapi.responses import JSONResponse
 from sqlalchemy.future import select
@@ -301,4 +301,6 @@ async def patch_promo(
     response_data = {key: uuid_to_str(value) for key, value in promo_data.items() if value is not None}
 
     return JSONResponse(content=response_data)
+
+from fastapi.responses import JSONResponse
 
