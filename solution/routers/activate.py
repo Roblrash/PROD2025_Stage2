@@ -22,6 +22,8 @@ def get_redis(request: Request) -> Redis:
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 
+from fastapi.responses import JSONResponse
+
 @router.get("/promo/history", response_model=List[PromoForUser])
 async def get_promo_history(
     limit: int = Query(10, ge=1),
@@ -40,6 +42,9 @@ async def get_promo_history(
     user_result = await db.execute(user_query)
     user = user_result.scalar()
 
+    if user is None:
+        raise HTTPException(status_code=404, detail="Пользователь не найден.")
+
     promo_query = (
         select(PromoCode)
         .join(user_activated_promos)
@@ -48,7 +53,6 @@ async def get_promo_history(
         .limit(limit)
         .offset(offset)
     )
-
     promo_result = await db.execute(promo_query)
     promo_history = promo_result.scalars().all()
 
@@ -80,7 +84,8 @@ async def get_promo_history(
 
         formatted_promo_history.append(formatted_promo)
 
-    return formatted_promo_history
+    return JSONResponse(content=formatted_promo_history, headers={"X-Total-Count": str(len(formatted_promo_history))})
+
 
 
 
@@ -139,6 +144,9 @@ async def activate_promo(
 
     if active_from > current_date or active_until < current_date:
         raise HTTPException(status_code=403, detail="Промокод не активен в текущий период.")
+    else:
+        if not promo.active:
+            promo.active = True
 
     if promo.target.get("country"):
         target_country = promo.target["country"].lower()

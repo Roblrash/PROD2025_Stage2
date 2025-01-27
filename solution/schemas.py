@@ -135,8 +135,8 @@ class PromoReadOnly(BaseModel):
             date: lambda v: v.strftime('%Y-%m-%d')
         }
 
-class Countries(BaseModel):
-    country: Optional[constr(pattern=r'^[A-Za-z]{2}$')] = None
+class CountryStat(BaseModel):
+    country: constr(pattern=r'^[A-Za-z]{2}$')
     activations_count: conint(ge=1)
 
     @field_validator('country')
@@ -150,7 +150,7 @@ class Countries(BaseModel):
 
 class PromoStat(BaseModel):
     activations_count: conint(ge=0)
-    countries: Optional[Countries] = None
+    countries: List[CountryStat] = []
 
 class UserTargetSettings(BaseModel):
     age: conint(ge=0, le=100)

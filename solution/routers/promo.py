@@ -302,5 +302,60 @@ async def patch_promo(
 
     return JSONResponse(content=response_data)
 
-from fastapi.responses import JSONResponse
+from models.user import User, user_activated_promos
+from schemas import CountryStat
+
+@router.get("/{id}/stat", response_model=PromoStat)
+async def get_promo_stat(
+    id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_company=Depends(get_current_company),
+) -> PromoStat:
+    result = await db.execute(
+        select(PromoCode).where(PromoCode.promo_id == id)
+    )
+    promo_code = result.scalar()
+
+    if not promo_code:
+        raise HTTPException(status_code=404, detail="Промокод не найден.")
+
+    if promo_code.company_id != current_company.id:
+        raise HTTPException(status_code=403, detail="Промокод не принадлежит этой компании.")
+
+    total_activations_res = await db.execute(
+        select(func.count()).select_from(user_activated_promos).where(
+            user_activated_promos.c.promo_id == promo_code.promo_id
+        )
+    )
+    total_activations = total_activations_res.scalar() or 0
+
+    country_stats_res = await db.execute(
+        select(
+            User.other["country"].astext.label("country"),
+            func.count().label("cnt")
+        )
+        .select_from(User)
+        .join(
+            user_activated_promos,
+            user_activated_promos.c.user_id == User.id
+        )
+        .where(user_activated_promos.c.promo_id == promo_code.promo_id)
+        .group_by(User.other["country"])
+    )
+
+    rows = country_stats_res.all()
+
+    filtered_rows = [(c, cnt) for (c, cnt) in rows if c is not None]
+    sorted_rows = sorted(filtered_rows, key=lambda x: x[0].lower())
+
+    countries_data: List[CountryStat] = []
+    for country_code, count_activations in sorted_rows:
+        countries_data.append(
+            CountryStat(country=country_code, activations_count=count_activations)
+        )
+
+    return PromoStat(
+        activations_count=total_activations,
+        countries=countries_data
+    )
 
