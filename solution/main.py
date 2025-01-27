@@ -60,8 +60,8 @@ if __name__ == "__main__":
 
 #docker exec -it fastapi_db bash
 #psql -U postgres -d postgres
-# DROP SCHEMA public CASCADE;
-# CREATE SCHEMA public;
+#DROP SCHEMA public CASCADE;
+#CREATE SCHEMA public;
 #\q
 #exit
 #docker exec -it fastapi_app alembic upgrade 2025_01_20_123456

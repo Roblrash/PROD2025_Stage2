@@ -110,7 +110,7 @@ async def activate_promo(
     if promo.mode == "COMMON" and promo.used_count >= promo.max_count:
         raise HTTPException(status_code=403, detail="Лимит использования промокода исчерпан.")
 
-    if promo.mode == "UNIQUE" and not promo.promo_unique:
+    if promo.mode == "UNIQUE" and promo.unique_count <= 0:
         raise HTTPException(status_code=403, detail="Нет доступных уникальных промокодов.")
 
     antifraud_result = await call_antifraud_service(current_user.email, promo.promo_id, redis)
@@ -123,7 +123,8 @@ async def activate_promo(
 
     promo.used_count += 1
     if promo.mode == "UNIQUE":
-        promo_value = promo.promo_unique.pop()
+        promo_value = promo.promo_unique[0]
+        promo.unique_count -= 1
     else:
         promo_value = promo.promo_common
 

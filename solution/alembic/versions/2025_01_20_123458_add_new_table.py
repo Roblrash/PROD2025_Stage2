@@ -46,6 +46,7 @@ def upgrade():
         sa.Column('max_count', sa.Integer, nullable=True),
         sa.Column('like_count', sa.Integer, default=0),
         sa.Column('used_count', sa.Integer, default=0),
+        sa.Column('unique_count', sa.Integer, default=0),
         sa.Column('active', sa.Boolean, default=True),
         sa.Column('created_at', sa.TIMESTAMP, nullable=False, server_default=sa.func.now()),
         sa.Column('comment_count', sa.Integer, default=0)
