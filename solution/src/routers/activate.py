@@ -16,6 +16,12 @@ from src.schemas import PromoForUser
 from src.backend.db import get_db
 from src.dependencies import get_current_user
 
+
+
+"""
+НЕ РЕАЛИЗОВАНАЯ РУЧКА "Код не работает :("
+"""
+
 router = APIRouter(prefix="/api/user")
 
 

@@ -2,6 +2,9 @@ from datetime import datetime, date
 from src.models.promocode import PromoCode
 
 def calculate_active(promo: PromoCode) -> bool:
+    """
+    Проверяет условия для изменения параметра active при выводе
+    """
     current_date = datetime.utcnow().date()
     active_from = promo.active_from or date.min
     active_until = promo.active_until or date.max
