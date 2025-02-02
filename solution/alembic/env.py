@@ -5,7 +5,7 @@ import asyncio
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 
-from config import settings
+from src.backend.config import settings
 
 config = context.config
 
@@ -13,8 +13,8 @@ if config.config_file_name:
     fileConfig(config.config_file_name)
 
 config.set_main_option("sqlalchemy.url", settings.database_url)
-from backend.db import Base
-from models import *
+from src.backend.db import Base
+from src.models import *
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,
