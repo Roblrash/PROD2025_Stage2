@@ -3,8 +3,6 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     SERVER_ADDRESS: str
     SERVER_PORT: int
-    #POSTGRES_CONN: str
-    #POSTGRES_JDBC_URL: str
     POSTGRES_USERNAME: str
     POSTGRES_PASSWORD: str
     POSTGRES_HOST: str
@@ -21,5 +19,4 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
-#менять на solution/.env для alembic
 settings = Settings()
