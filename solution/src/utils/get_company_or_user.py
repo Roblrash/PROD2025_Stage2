@@ -1,6 +1,6 @@
+from fastapi.security import APIKeyHeader
 from src.backend.config import settings
 from src.models.user import User
-from src.routers.auth import auth_header
 from fastapi import HTTPException, Request, Depends, Security
 from sqlalchemy.ext.asyncio import AsyncSession
 from jose import jwt, JWTError, ExpiredSignatureError
@@ -9,6 +9,8 @@ from src.models.company import Company
 from sqlalchemy.future import select
 from redis.asyncio import Redis
 import uuid
+
+auth_header = APIKeyHeader(name="Authorization", auto_error=False)
 
 def get_redis(request: Request) -> Redis:
     return request.app.state.redis

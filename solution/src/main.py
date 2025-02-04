@@ -6,7 +6,7 @@ import uvicorn
 
 from src.backend.redis import connect, close
 from src.backend.config import settings
-from src.routers import auth, promo, auth_user, user_profile, activate, user_promo
+from src.routers import auth, promo, auth_user, user_profile, user_promo
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -27,7 +27,6 @@ app.include_router(auth.router)
 app.include_router(promo.router)
 app.include_router(auth_user.router)
 app.include_router(user_profile.router)
-app.include_router(activate.router)
 app.include_router(user_promo.router)
 
 @app.get("/api/ping")

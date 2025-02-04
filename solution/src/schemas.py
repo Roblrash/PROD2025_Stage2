@@ -294,16 +294,11 @@ class CompanyId(BaseModel):
 
 class CompanyResponse(BaseModel):
     token: str = Field(..., max_length=300)
-    company_id: CompanyId
+    company_id: UUID
 
 
 class SignInResponse(BaseModel):
     token: str = Field(..., max_length=300)
-
-
-class CompanyName(BaseModel):
-    company_name: str = Field(..., min_length=5, max_length=50)
-
 
 class CompanyCreate(BaseModel):
     name: str = Field(..., min_length=5, max_length=50)
